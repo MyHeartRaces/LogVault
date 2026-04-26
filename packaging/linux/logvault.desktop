@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=LogVault
+Comment=Download Warcraft Logs reports
+Exec=logvault-gui
+Icon=logvault
+Terminal=false
+Categories=Game;Utility;
+StartupNotify=true
+

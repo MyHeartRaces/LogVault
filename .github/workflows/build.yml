@@ -1,0 +1,85 @@
+name: Build executables
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.artifact_name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact_name: LogVault-windows-x64
+            artifact_path: release/LogVault-windows-x64.exe
+          - os: ubuntu-latest
+            artifact_name: LogVault-linux-x64
+            artifact_path: release/*
+          - os: macos-latest
+            artifact_name: LogVault-macos
+            artifact_path: release/LogVault-macos-arm64
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install Linux Tk libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-tk
+
+      - name: Install build tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pyinstaller
+
+      - name: Run tests
+        run: python -m unittest discover -s tests -p "test_*.py"
+        env:
+          PYTHONPATH: src
+
+      - name: Build one-file executable
+        run: python -m PyInstaller --clean --noconfirm LogVault.spec
+
+      - name: Prepare artifact
+        shell: bash
+        run: |
+          mkdir -p release
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            cp dist/LogVault.exe release/LogVault-windows-x64.exe
+          elif [[ "$RUNNER_OS" == "Linux" ]]; then
+            cp dist/LogVault release/LogVault-linux-x64
+            chmod +x release/LogVault-linux-x64
+            cp scripts/install_linux_desktop.sh release/install_linux_desktop.sh
+            cp assets/logvault.svg release/logvault.svg
+          else
+            cp dist/LogVault release/LogVault-macos-arm64
+            chmod +x release/LogVault-macos-arm64
+          fi
+
+      - name: Upload executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_path }}
+          if-no-files-found: error
+
+      - name: Upload files to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*
