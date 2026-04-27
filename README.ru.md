@@ -26,9 +26,9 @@ LogVault скачивает отчеты World of Warcraft через Warcraft L
 
 Бинарники, установщики и пакеты публикуются в GitHub Releases:
 
-- Windows: установщик `LogVault-Setup-*-x64.exe` и portable `LogVault-windows-x64.exe`.
-- Linux: portable `LogVault-linux-x64`, скрипт установки desktop entry и Arch-пакет `logvault-bin-*-x86_64.pkg.tar.zst`.
-- macOS: `LogVault-macos-arm64.dmg`, `.app.zip` и raw binary `LogVault-macos-arm64`.
+- Windows: установщик `LogVault-Setup-*-x64.exe` и `LogVault-windows-x64-portable.exe`.
+- Linux: Arch-пакет `logvault-bin-*-x86_64.pkg.tar.zst` и `LogVault-linux-x64-portable`.
+- macOS: `LogVault-macos-arm64.dmg`.
 
 Windows SmartScreen может ругаться на `.exe`, потому что бинарник не подписан платным code-signing сертификатом.
 
@@ -50,6 +50,8 @@ WCL_CLIENT_SECRET=...
 ```bash
 curl -u CLIENT_ID:CLIENT_SECRET -d grant_type=client_credentials https://www.warcraftlogs.com/oauth/token
 ```
+
+В GUI опция `Save credentials to app .env` сохраняет ключи в config-директорию приложения, если запущена установленная сборка. При запуске из исходников используется `.env` в репозитории.
 
 Официальные ссылки:
 
@@ -207,11 +209,11 @@ sudo pacman -U logvault-bin-*-x86_64.pkg.tar.zst
 
 Он ставит бинарник и desktop launcher, после чего LogVault появляется в меню приложений.
 
-Portable-вариант тоже есть. Скачай `LogVault-linux-x64`, `install_linux_desktop.sh` и `logvault.svg` из релиза:
+Portable-вариант тоже есть. Скачай `LogVault-linux-x64-portable`, `install_linux_desktop.sh` и `logvault.svg` из релиза:
 
 ```bash
-chmod +x LogVault-linux-x64 install_linux_desktop.sh
-./install_linux_desktop.sh ./LogVault-linux-x64
+chmod +x LogVault-linux-x64-portable install_linux_desktop.sh
+./install_linux_desktop.sh ./LogVault-linux-x64-portable
 ```
 
 Будет установлено:
@@ -251,8 +253,8 @@ chmod +x scripts/build_unix.sh
 GitHub Actions собирает Windows, Linux, macOS, установщик, app bundle и Arch package на tag:
 
 ```bash
-git tag v0.5.1
-git push origin v0.5.1
+git tag v0.5.2
+git push origin v0.5.2
 ```
 
 ## Тесты

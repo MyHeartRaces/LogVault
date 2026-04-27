@@ -68,18 +68,16 @@ jobs:
         run: |
           mkdir -p release
           if [[ "$RUNNER_OS" == "Windows" ]]; then
-            cp dist/LogVault.exe release/LogVault-windows-x64.exe
+            cp dist/LogVault.exe release/LogVault-windows-x64-portable.exe
             cp installer/LogVault-Setup-*-x64.exe release/
           elif [[ "$RUNNER_OS" == "Linux" ]]; then
-            cp dist/LogVault release/LogVault-linux-x64
-            chmod +x release/LogVault-linux-x64
+            cp dist/LogVault release/LogVault-linux-x64-portable
+            chmod +x release/LogVault-linux-x64-portable
             cp scripts/install_linux_desktop.sh release/install_linux_desktop.sh
             cp assets/logvault.svg release/logvault.svg
             chmod +x scripts/package_arch_binary.sh
             ./scripts/package_arch_binary.sh
           else
-            cp dist/LogVault release/LogVault-macos-arm64
-            chmod +x release/LogVault-macos-arm64
             chmod +x scripts/package_macos_app.sh
             ./scripts/package_macos_app.sh
           fi

@@ -26,9 +26,9 @@ Character batch exports also include:
 
 Prebuilt binaries and installers are published on GitHub Releases:
 
-- Windows: `LogVault-Setup-*-x64.exe` installer, plus the portable `LogVault-windows-x64.exe`.
-- Linux: `LogVault-linux-x64` portable binary, desktop install script, and `logvault-bin-*-x86_64.pkg.tar.zst` for Arch.
-- macOS: `LogVault-macos-arm64.dmg`, `.app.zip`, and the raw `LogVault-macos-arm64` binary.
+- Windows: `LogVault-Setup-*-x64.exe` installer, plus `LogVault-windows-x64-portable.exe`.
+- Linux: `logvault-bin-*-x86_64.pkg.tar.zst` for Arch, plus `LogVault-linux-x64-portable`.
+- macOS: `LogVault-macos-arm64.dmg`.
 
 Windows SmartScreen may warn about the `.exe` because the binary is not code-signed.
 
@@ -50,6 +50,8 @@ You do not need to fetch a token manually. LogVault automatically performs the e
 ```bash
 curl -u CLIENT_ID:CLIENT_SECRET -d grant_type=client_credentials https://www.warcraftlogs.com/oauth/token
 ```
+
+In the GUI, `Save credentials to app .env` stores credentials in the application config directory when running an installed build. When running from source, it writes the repository `.env`.
 
 Useful official links:
 
@@ -205,11 +207,11 @@ sudo pacman -U logvault-bin-*-x86_64.pkg.tar.zst
 
 It installs the binary and a desktop launcher, so LogVault appears in the application menu.
 
-Portable install is also available. Download `LogVault-linux-x64`, `install_linux_desktop.sh`, and `logvault.svg` from the release, then run:
+Portable install is also available. Download `LogVault-linux-x64-portable`, `install_linux_desktop.sh`, and `logvault.svg` from the release, then run:
 
 ```bash
-chmod +x LogVault-linux-x64 install_linux_desktop.sh
-./install_linux_desktop.sh ./LogVault-linux-x64
+chmod +x LogVault-linux-x64-portable install_linux_desktop.sh
+./install_linux_desktop.sh ./LogVault-linux-x64-portable
 ```
 
 This installs:
@@ -249,8 +251,8 @@ chmod +x scripts/build_unix.sh
 GitHub Actions also builds Windows, Linux, macOS, installer, app, and Arch package artifacts on tags:
 
 ```bash
-git tag v0.5.1
-git push origin v0.5.1
+git tag v0.5.2
+git push origin v0.5.2
 ```
 
 ## Tests

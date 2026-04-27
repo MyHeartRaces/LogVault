@@ -31,14 +31,17 @@ class LogVaultApp:
         self.root.title("LogVault - Warcraft Logs Exporter")
         self.icon_image: Any | None = None
         self._set_window_icon()
-        self.root.geometry("960x820")
-        self.root.minsize(820, 720)
+        self.root.geometry("980x720")
+        self.root.minsize(760, 520)
 
         self.messages: queue.Queue[tuple[str, Any]] = queue.Queue()
         self.worker: threading.Thread | None = None
         self.last_result: DownloadResult | CharacterReportsResult | None = None
 
+        self.env_path = default_env_path()
         load_env_file(Path(".env"))
+        if self.env_path != Path(".env"):
+            load_env_file(self.env_path)
         self.mode_var = tk.StringVar(value="report")
         self.report_var = tk.StringVar()
         self.fight_var = tk.StringVar(value="last")
@@ -52,7 +55,7 @@ class LogVaultApp:
         self.max_reports_var = tk.StringVar(value="0")
         self.client_id_var = tk.StringVar(value=os.getenv("WCL_CLIENT_ID", ""))
         self.client_secret_var = tk.StringVar(value=os.getenv("WCL_CLIENT_SECRET", ""))
-        self.save_env_var = tk.BooleanVar(value=False)
+        self.save_env_var = tk.BooleanVar(value=True)
         self.tables_var = tk.StringVar(value="standard")
         self.events_var = tk.StringVar(value="compact")
         self.filter_var = tk.StringVar()
@@ -62,6 +65,7 @@ class LogVaultApp:
         self.allow_unlisted_var = tk.BooleanVar(value=True)
         self.limit_var = tk.StringVar(value="10000")
         self.max_pages_var = tk.StringVar()
+        self.status_var = tk.StringVar(value="Ready.")
 
         self._configure_style()
         self._build()
@@ -102,6 +106,7 @@ class LogVaultApp:
         style.configure("TFrame", background=self.colors["bg"])
         style.configure("Panel.TFrame", background=self.colors["panel"])
         style.configure("TLabel", background=self.colors["panel"], foreground=self.colors["text"])
+        style.configure("Root.TLabel", background=self.colors["bg"], foreground=self.colors["muted"])
         style.configure("Muted.TLabel", background=self.colors["panel"], foreground=self.colors["muted"])
         style.configure(
             "TLabelframe",
@@ -252,6 +257,18 @@ class LogVaultApp:
             lightcolor=self.colors["gold_light"],
             darkcolor="#8a5417",
         )
+        style.configure(
+            "Vertical.TScrollbar",
+            background=self.colors["panel_alt"],
+            troughcolor="#0f1318",
+            bordercolor=self.colors["line"],
+            arrowcolor=self.colors["gold"],
+        )
+        style.map(
+            "Vertical.TScrollbar",
+            background=[("pressed", "#141a21"), ("active", "#263140")],
+            arrowcolor=[("pressed", self.colors["gold_light"]), ("active", self.colors["gold_light"])],
+        )
         style.configure("ComboboxPopdownFrame", background="#0f1318", bordercolor=self.colors["line"])
 
     def _set_window_icon(self) -> None:
@@ -267,10 +284,28 @@ class LogVaultApp:
             self.icon_image = None
 
     def _build(self) -> None:
-        root_frame = ttk.Frame(self.root, padding=14)
-        root_frame.grid(row=0, column=0, sticky="nsew")
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
+
+        shell = ttk.Frame(self.root)
+        shell.grid(row=0, column=0, sticky="nsew")
+        shell.columnconfigure(0, weight=1)
+        shell.rowconfigure(0, weight=1)
+
+        self.scroll_canvas = tk.Canvas(shell, bg=self.colors["bg"], bd=0, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(shell, orient="vertical", command=self.scroll_canvas.yview)
+        self.scroll_canvas.configure(yscrollcommand=scrollbar.set)
+        self.scroll_canvas.grid(row=0, column=0, sticky="nsew")
+        scrollbar.grid(row=0, column=1, sticky="ns")
+
+        root_frame = ttk.Frame(self.scroll_canvas, padding=14)
+        self.scroll_window = self.scroll_canvas.create_window((0, 0), window=root_frame, anchor="nw")
+        root_frame.bind("<Configure>", self._update_scroll_region)
+        self.scroll_canvas.bind("<Configure>", self._resize_scroll_window)
+        self.root.bind_all("<MouseWheel>", self._on_mousewheel)
+        self.root.bind_all("<Button-4>", self._on_mousewheel)
+        self.root.bind_all("<Button-5>", self._on_mousewheel)
+
         root_frame.columnconfigure(0, weight=1)
         root_frame.rowconfigure(5, weight=1)
 
@@ -326,7 +361,7 @@ class LogVaultApp:
         ttk.Entry(credentials, textvariable=self.client_secret_var, show="*").grid(
             row=0, column=3, sticky="ew", padx=6, pady=6
         )
-        ttk.Checkbutton(credentials, text="Save credentials to local .env", variable=self.save_env_var).grid(
+        ttk.Checkbutton(credentials, text="Save credentials to app .env", variable=self.save_env_var).grid(
             row=1, column=1, columnspan=3, sticky="w", padx=6, pady=(2, 8)
         )
 
@@ -370,6 +405,13 @@ class LogVaultApp:
         self.open_button.grid(row=0, column=1, sticky="w", padx=(8, 0))
         self.progress = ttk.Progressbar(actions, mode="indeterminate")
         self.progress.grid(row=0, column=2, sticky="ew", padx=(12, 0))
+        ttk.Label(actions, textvariable=self.status_var, style="Root.TLabel").grid(
+            row=1,
+            column=0,
+            columnspan=3,
+            sticky="w",
+            pady=(6, 0),
+        )
 
         log_frame = ttk.LabelFrame(root_frame, text="Progress")
         log_frame.grid(row=5, column=0, sticky="nsew", pady=(8, 0))
@@ -431,6 +473,24 @@ class LogVaultApp:
         canvas.after_idle(draw)
         return canvas
 
+    def _update_scroll_region(self, _event=None) -> None:
+        self.scroll_canvas.configure(scrollregion=self.scroll_canvas.bbox("all"))
+
+    def _resize_scroll_window(self, event: Any) -> None:
+        self.scroll_canvas.itemconfigure(self.scroll_window, width=event.width)
+
+    def _on_mousewheel(self, event: Any) -> None:
+        if event.widget == self.log or str(event.widget).startswith(str(self.log)):
+            return
+        if getattr(event, "num", None) == 4:
+            units = -3
+        elif getattr(event, "num", None) == 5:
+            units = 3
+        else:
+            delta = int(getattr(event, "delta", 0) or 0)
+            units = -1 * int(delta / 120) if abs(delta) >= 120 else (-1 if delta > 0 else 1)
+        self.scroll_canvas.yview_scroll(units, "units")
+
     def _label(self, parent: Any, text: str, row: int, column: int) -> None:
         ttk.Label(parent, text=text).grid(row=row, column=column, sticky="w", padx=(8, 0), pady=6)
 
@@ -441,21 +501,33 @@ class LogVaultApp:
 
     def _start_download(self) -> None:
         if self.worker and self.worker.is_alive():
+            self.status_var.set("Download is already running.")
             return
+        self._clear_log()
+        self._append_log("Validating input...")
         try:
             options = self._collect_options()
         except ValueError as exc:
+            self.status_var.set("Input error.")
+            self._append_log(f"Invalid input: {exc}")
             messagebox.showerror("Invalid input", str(exc))
             return
 
         if self.save_env_var.get():
-            self._save_env(options)
+            try:
+                saved_path = self._save_env(options)
+            except OSError as exc:
+                self.status_var.set("Could not save credentials.")
+                self._append_log(f"Could not save credentials: {exc}")
+                messagebox.showerror("Could not save credentials", str(exc))
+                return
+            self._append_log(f"Saved credentials to {saved_path}")
 
         self.last_result = None
         self.open_button.configure(state="disabled")
         self.download_button.configure(state="disabled")
         self.progress.start(12)
-        self._clear_log()
+        self.status_var.set("Downloading...")
         self._append_log("Starting download...")
 
         self.worker = threading.Thread(target=self._download_worker, args=(options,), daemon=True)
@@ -472,6 +544,10 @@ class LogVaultApp:
         max_pages = parse_positive_int(max_pages_text, "Max pages") if max_pages_text else None
         max_reports_text = self.max_reports_var.get().strip()
         max_reports = parse_non_negative_int(max_reports_text, "Max reports") if max_reports_text else 0
+        make_zip = self.zip_var.get()
+        archive_only = self.archive_only_var.get()
+        if archive_only and not make_zip:
+            raise ValueError("Keep only archive requires Create zip archive.")
 
         if self.mode_var.get() == "character":
             character = self.character_var.get().strip()
@@ -494,8 +570,8 @@ class LogVaultApp:
                 events=self.events_var.get().strip() or "standard",
                 filter_expression=self.filter_var.get().strip() or None,
                 out=Path(self.out_var.get().strip() or "exports"),
-                make_zip=self.zip_var.get(),
-                archive_only=self.archive_only_var.get(),
+                make_zip=make_zip,
+                archive_only=archive_only,
                 limit=limit,
                 max_pages=max_pages,
                 allow_unlisted=self.allow_unlisted_var.get(),
@@ -511,8 +587,8 @@ class LogVaultApp:
             events=self.events_var.get().strip() or "standard",
             filter_expression=self.filter_var.get().strip() or None,
             out=Path(self.out_var.get().strip() or "exports"),
-            make_zip=self.zip_var.get(),
-            archive_only=self.archive_only_var.get(),
+            make_zip=make_zip,
+            archive_only=archive_only,
             limit=limit,
             max_pages=max_pages,
             allow_unlisted=self.allow_unlisted_var.get(),
@@ -521,13 +597,17 @@ class LogVaultApp:
             difficulty_id=difficulty_id,
         )
 
-    def _save_env(self, options: DownloadOptions | CharacterReportsOptions) -> None:
+    def _save_env(self, options: DownloadOptions | CharacterReportsOptions) -> Path:
         lines = [
             "# Warcraft Logs OAuth client credentials.",
             f"WCL_CLIENT_ID={options.client_id or ''}",
             f"WCL_CLIENT_SECRET={options.client_secret or ''}",
         ]
-        Path(".env").write_text("\n".join(lines) + "\n", encoding="utf-8")
+        self.env_path.parent.mkdir(parents=True, exist_ok=True)
+        self.env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        os.environ["WCL_CLIENT_ID"] = options.client_id or ""
+        os.environ["WCL_CLIENT_SECRET"] = options.client_secret or ""
+        return self.env_path
 
     def _download_worker(self, options: DownloadOptions | CharacterReportsOptions) -> None:
         try:
@@ -552,10 +632,12 @@ class LogVaultApp:
                 self._append_log(str(payload))
             elif kind == "error":
                 self._finish_running()
+                self.status_var.set("Download failed.")
                 self._append_log(f"Error: {payload}")
                 messagebox.showerror("Download failed", str(payload))
             elif kind == "done":
                 self._finish_running()
+                self.status_var.set("Finished.")
                 self.last_result = payload
                 self.open_button.configure(state="normal")
                 self._append_log("Finished.")
@@ -615,6 +697,18 @@ def asset_path(name: str) -> Path:
     if base:
         return Path(base) / "assets" / name
     return Path(__file__).resolve().parents[2] / "assets" / name
+
+
+def default_env_path() -> Path:
+    if not getattr(sys, "frozen", False):
+        return Path(".env")
+    if sys.platform == "win32":
+        base = Path(os.getenv("APPDATA") or Path.home() / "AppData" / "Roaming")
+        return base / "LogVault" / ".env"
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / "LogVault" / ".env"
+    base = Path(os.getenv("XDG_CONFIG_HOME") or Path.home() / ".config")
+    return base / "logvault" / ".env"
 
 
 def main() -> int:

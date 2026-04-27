@@ -57,15 +57,9 @@ EOF
 
 echo "APPL????" > "$APP_DIR/Contents/PkgInfo"
 
-(
-  cd "$(dirname "$APP_DIR")"
-  zip -r -X "$ROOT/$RELEASE_DIR/LogVault-macos-arm64.app.zip" "LogVault.app" >/dev/null
-)
-
 mkdir -p "$DMG_ROOT"
 COPYFILE_DISABLE=1 cp -R "$APP_DIR" "$DMG_ROOT/LogVault.app"
 ln -s /Applications "$DMG_ROOT/Applications"
 hdiutil create -volname LogVault -srcfolder "$DMG_ROOT" -ov -format UDZO "$ROOT/$RELEASE_DIR/LogVault-macos-arm64.dmg"
 
-echo "Built: $ROOT/$RELEASE_DIR/LogVault-macos-arm64.app.zip"
 echo "Built: $ROOT/$RELEASE_DIR/LogVault-macos-arm64.dmg"
