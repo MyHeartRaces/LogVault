@@ -199,6 +199,12 @@ macOS:
 2. Открой DMG и перетащи `LogVault.app` в Applications.
 3. Если Gatekeeper блокирует неподписанное приложение, нажми правой кнопкой по приложению и выбери Open.
 
+Если macOS пишет, что приложение повреждено после скачивания с GitHub, сними quarantine-флаг:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/LogVault.app
+```
+
 ## Arch Linux
 
 AppImage не нужен. В релизе есть Arch-пакет:
@@ -253,8 +259,8 @@ chmod +x scripts/build_unix.sh
 GitHub Actions собирает Windows, Linux, macOS, установщик, app bundle и Arch package на tag:
 
 ```bash
-git tag v0.5.2
-git push origin v0.5.2
+git tag v0.5.3
+git push origin v0.5.3
 ```
 
 ## Тесты

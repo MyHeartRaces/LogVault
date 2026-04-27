@@ -197,6 +197,12 @@ macOS:
 2. Open the DMG and drag `LogVault.app` into Applications.
 3. If Gatekeeper blocks the unsigned app, right-click it and choose Open.
 
+If macOS says the app is damaged after downloading from GitHub, remove the quarantine flag:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/LogVault.app
+```
+
 ## Arch Linux Desktop Entry
 
 No AppImage is required. The release includes an Arch package:
@@ -251,8 +257,8 @@ chmod +x scripts/build_unix.sh
 GitHub Actions also builds Windows, Linux, macOS, installer, app, and Arch package artifacts on tags:
 
 ```bash
-git tag v0.5.2
-git push origin v0.5.2
+git tag v0.5.3
+git push origin v0.5.3
 ```
 
 ## Tests
