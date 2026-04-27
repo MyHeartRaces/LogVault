@@ -137,10 +137,82 @@ query ReportTable(
 """
 
 
+CHARACTER_RECENT_REPORTS_QUERY = """
+query CharacterRecentReports(
+  $name: String!,
+  $serverSlug: String!,
+  $serverRegion: String!,
+  $limit: Int!,
+  $page: Int!
+) {
+  characterData {
+    character(name: $name, serverSlug: $serverSlug, serverRegion: $serverRegion) {
+      id
+      canonicalID
+      name
+      recentReports(limit: $limit, page: $page) {
+        data {
+          code
+          title
+          startTime
+          endTime
+          zone {
+            id
+            name
+          }
+        }
+        total
+        per_page
+        current_page
+        last_page
+        has_more_pages
+      }
+    }
+  }
+}
+"""
+
+
+CHARACTER_RECENT_REPORTS_MINIMAL_QUERY = """
+query CharacterRecentReportsMinimal(
+  $name: String!,
+  $serverSlug: String!,
+  $serverRegion: String!,
+  $limit: Int!,
+  $page: Int!
+) {
+  characterData {
+    character(name: $name, serverSlug: $serverSlug, serverRegion: $serverRegion) {
+      id
+      canonicalID
+      name
+      recentReports(limit: $limit, page: $page) {
+        data {
+          code
+          title
+          startTime
+          endTime
+        }
+      }
+    }
+  }
+}
+"""
+
+
 @dataclass
 class EventPage:
     data: list[dict[str, Any]]
     next_page_timestamp: int | float | None
+
+
+@dataclass
+class CharacterReportPage:
+    character: dict[str, Any]
+    reports: list[dict[str, Any]]
+    page: int
+    has_more_pages: bool
+    total: int | None
 
 
 class WarcraftLogsClient:
@@ -236,6 +308,44 @@ class WarcraftLogsClient:
         return EventPage(
             data=list(events.get("data") or []),
             next_page_timestamp=events.get("nextPageTimestamp"),
+        )
+
+    def fetch_character_recent_reports(
+        self,
+        *,
+        name: str,
+        server_slug: str,
+        server_region: str,
+        limit: int = 100,
+        page: int = 1,
+    ) -> CharacterReportPage:
+        variables = {
+            "name": name,
+            "serverSlug": server_slug,
+            "serverRegion": server_region.lower(),
+            "limit": limit,
+            "page": page,
+        }
+        try:
+            data = self.graphql(CHARACTER_RECENT_REPORTS_QUERY, variables)
+        except GraphQLError as exc:
+            if "Cannot query field" not in str(exc):
+                raise
+            data = self.graphql(CHARACTER_RECENT_REPORTS_MINIMAL_QUERY, variables)
+        character = (data.get("characterData") or {}).get("character")
+        if not character:
+            raise WarcraftLogsError(
+                f"Character not found: {name} on {server_region}/{server_slug}. "
+                "Check character name, realm slug, and region."
+            )
+        pagination = character.get("recentReports") or {}
+        reports = list(pagination.get("data") or [])
+        return CharacterReportPage(
+            character={key: value for key, value in character.items() if key != "recentReports"},
+            reports=reports,
+            page=int(pagination.get("current_page") or page),
+            has_more_pages=bool(pagination.get("has_more_pages", len(reports) >= limit)),
+            total=pagination.get("total"),
         )
 
     def iter_events(

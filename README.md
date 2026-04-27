@@ -90,6 +90,16 @@ logvault-gui
 
 В окне можно вставить ссылку на отчет, выбрать fight (`last`, `boss`, `all` или номер), указать папку экспорта и запустить скачивание. Нужны только `Client ID` и `Client secret`; OAuth token будет получен автоматически.
 
+Для массовой выгрузки персонажа переключи режим на `Character reports`, укажи:
+
+- Character - имя персонажа.
+- Realm slug - slug реалма в Warcraft Logs, например `draenor`, `howling-fjord`.
+- Region - `eu`, `us`, `kr`, `tw`, `cn`.
+- Difficulty - `All`, `Mythic`, `Heroic`, `Normal`, `LFR`.
+- Season start / Season end - даты сезона в формате `YYYY-MM-DD`.
+
+В этом режиме LogVault берет `recentReports` персонажа, фильтрует отчеты по датам сезона, а внутри каждого отчета выгружает только бои выбранной сложности. Результат складывается в одну папку с `index.md`, `reports.csv`, `manifest.json` и общим zip.
+
 CLI:
 
 Скачать конкретный бой из URL:
@@ -126,6 +136,24 @@ logvault REPORTCODE --events none
 
 ```bash
 logvault REPORTCODE --fight 12 --events DamageDone,Casts,Deaths,Interrupts
+```
+
+Скачать все доступные отчеты персонажа за сезон, только Mythic:
+
+```bash
+logvault \
+  --character CharacterName \
+  --server realm-slug \
+  --region eu \
+  --difficulty mythic \
+  --season-start 2026-01-01 \
+  --season-end 2026-06-30
+```
+
+Скачать все сложности за сезон:
+
+```bash
+logvault --character CharacterName --server realm-slug --region eu --difficulty all --season-start 2026-01-01 --season-end 2026-06-30
 ```
 
 По умолчанию LogVault передает `allowUnlisted=true`, поэтому отчеты по прямой ссылке обычно доступны. Private-логи, требующие пользовательской авторизации, могут не открыться через client credentials.

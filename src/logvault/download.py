@@ -8,6 +8,7 @@ from typing import Any
 
 from .api import WarcraftLogsClient
 from .cli_defaults import DEFAULT_EVENT_TYPES, DEFAULT_TABLE_TYPES
+from .difficulty import difficulty_label
 from .env import load_env_file
 from .exporter import export_bundle, fresh_output_dir
 from .selection import parse_list, parse_report_input, resolve_fight_ids, selected_time_window
@@ -34,6 +35,7 @@ class DownloadOptions:
     access_token: str | None = None
     timeout: float = 60.0
     env_file: Path | None = Path(".env")
+    difficulty_id: int | None = None
 
 
 @dataclass
@@ -61,6 +63,13 @@ def download_report(options: DownloadOptions, progress: ProgressCallback | None 
     progress(f"Fetching report metadata for {report_input.code}...")
     report = client.fetch_report_metadata(report_input.code, allow_unlisted=options.allow_unlisted)
     fights = list(report.get("fights") or [])
+    if options.difficulty_id is not None:
+        fights = [
+            fight
+            for fight in fights
+            if int(fight.get("difficulty") or -1) == options.difficulty_id
+        ]
+        progress(f"Applied difficulty filter: {difficulty_label(options.difficulty_id)}")
     fight_ids = resolve_fight_ids(
         fights,
         explicit=options.fight,

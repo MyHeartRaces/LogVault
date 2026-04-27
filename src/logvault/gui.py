@@ -17,6 +17,8 @@ except ImportError:  # pragma: no cover - depends on OS Python packages.
     messagebox = None
     scrolledtext = None
 
+from .character_export import CharacterReportsOptions, CharacterReportsResult, download_character_reports
+from .difficulty import DIFFICULTY_CHOICES, parse_difficulty
 from .download import DownloadOptions, DownloadResult, download_report
 from .env import load_env_file
 from .errors import LogVaultError
@@ -26,17 +28,25 @@ class LogVaultApp:
     def __init__(self, root: Any) -> None:
         self.root = root
         self.root.title("LogVault")
-        self.root.geometry("920x720")
-        self.root.minsize(760, 620)
+        self.root.geometry("960x820")
+        self.root.minsize(820, 720)
 
         self.messages: queue.Queue[tuple[str, Any]] = queue.Queue()
         self.worker: threading.Thread | None = None
-        self.last_result: DownloadResult | None = None
+        self.last_result: DownloadResult | CharacterReportsResult | None = None
 
         load_env_file(Path(".env"))
+        self.mode_var = tk.StringVar(value="report")
         self.report_var = tk.StringVar()
         self.fight_var = tk.StringVar(value="last")
         self.include_trash_var = tk.BooleanVar(value=False)
+        self.character_var = tk.StringVar()
+        self.server_var = tk.StringVar()
+        self.region_var = tk.StringVar(value="eu")
+        self.difficulty_var = tk.StringVar(value="All")
+        self.season_start_var = tk.StringVar()
+        self.season_end_var = tk.StringVar()
+        self.max_reports_var = tk.StringVar(value="0")
         self.client_id_var = tk.StringVar(value=os.getenv("WCL_CLIENT_ID", ""))
         self.client_secret_var = tk.StringVar(value=os.getenv("WCL_CLIENT_SECRET", ""))
         self.save_env_var = tk.BooleanVar(value=False)
@@ -66,13 +76,41 @@ class LogVaultApp:
         source = ttk.LabelFrame(root_frame, text="Report")
         source.grid(row=1, column=0, sticky="ew", pady=(12, 8))
         source.columnconfigure(1, weight=1)
-        self._label(source, "URL or code", 0, 0)
-        ttk.Entry(source, textvariable=self.report_var).grid(row=0, column=1, columnspan=4, sticky="ew", padx=6, pady=6)
-        self._label(source, "Fight", 1, 0)
+        source.columnconfigure(3, weight=1)
+        ttk.Radiobutton(source, text="Single report", variable=self.mode_var, value="report").grid(
+            row=0, column=0, sticky="w", padx=(8, 0), pady=6
+        )
+        ttk.Radiobutton(source, text="Character reports", variable=self.mode_var, value="character").grid(
+            row=0, column=1, sticky="w", padx=6, pady=6
+        )
+        self._label(source, "URL or code", 1, 0)
+        ttk.Entry(source, textvariable=self.report_var).grid(row=1, column=1, columnspan=3, sticky="ew", padx=6, pady=6)
+        self._label(source, "Fight", 2, 0)
         fight = ttk.Combobox(source, textvariable=self.fight_var, values=("", "last", "boss", "all"), width=18)
-        fight.grid(row=1, column=1, sticky="w", padx=6, pady=6)
+        fight.grid(row=2, column=1, sticky="w", padx=6, pady=6)
         ttk.Checkbutton(source, text="Include trash by default", variable=self.include_trash_var).grid(
-            row=1, column=2, sticky="w", padx=6, pady=6
+            row=2, column=2, sticky="w", padx=6, pady=6
+        )
+        self._label(source, "Character", 3, 0)
+        ttk.Entry(source, textvariable=self.character_var).grid(row=3, column=1, sticky="ew", padx=6, pady=6)
+        self._label(source, "Realm slug", 3, 2)
+        ttk.Entry(source, textvariable=self.server_var).grid(row=3, column=3, sticky="ew", padx=6, pady=6)
+        self._label(source, "Region", 4, 0)
+        ttk.Combobox(source, textvariable=self.region_var, values=("eu", "us", "kr", "tw", "cn"), width=10).grid(
+            row=4, column=1, sticky="w", padx=6, pady=6
+        )
+        self._label(source, "Difficulty", 4, 2)
+        ttk.Combobox(source, textvariable=self.difficulty_var, values=DIFFICULTY_CHOICES, width=14, state="readonly").grid(
+            row=4, column=3, sticky="w", padx=6, pady=6
+        )
+        self._label(source, "Season start", 5, 0)
+        ttk.Entry(source, textvariable=self.season_start_var, width=16).grid(row=5, column=1, sticky="w", padx=6, pady=6)
+        self._label(source, "Season end", 5, 2)
+        ttk.Entry(source, textvariable=self.season_end_var, width=16).grid(row=5, column=3, sticky="w", padx=6, pady=6)
+        self._label(source, "Max reports", 6, 0)
+        ttk.Entry(source, textvariable=self.max_reports_var, width=12).grid(row=6, column=1, sticky="w", padx=6, pady=6)
+        ttk.Label(source, text="Dates: YYYY-MM-DD. Max reports 0 means no local cap.").grid(
+            row=6, column=2, columnspan=2, sticky="w", padx=6, pady=6
         )
 
         credentials = ttk.LabelFrame(root_frame, text="Warcraft Logs OAuth client")
@@ -164,14 +202,46 @@ class LogVaultApp:
         self.worker = threading.Thread(target=self._download_worker, args=(options,), daemon=True)
         self.worker.start()
 
-    def _collect_options(self) -> DownloadOptions:
+    def _collect_options(self) -> DownloadOptions | CharacterReportsOptions:
         report = self.report_var.get().strip()
-        if not report:
+        difficulty_id = parse_difficulty(self.difficulty_var.get())
+        if self.mode_var.get() == "report" and not report:
             raise ValueError("Report URL or code is required.")
 
         limit = parse_positive_int(self.limit_var.get().strip(), "Events/page")
         max_pages_text = self.max_pages_var.get().strip()
         max_pages = parse_positive_int(max_pages_text, "Max pages") if max_pages_text else None
+        max_reports_text = self.max_reports_var.get().strip()
+        max_reports = parse_non_negative_int(max_reports_text, "Max reports") if max_reports_text else 0
+
+        if self.mode_var.get() == "character":
+            character = self.character_var.get().strip()
+            server = self.server_var.get().strip()
+            if not character:
+                raise ValueError("Character name is required in Character reports mode.")
+            if not server:
+                raise ValueError("Realm slug is required in Character reports mode.")
+            return CharacterReportsOptions(
+                character_name=character,
+                server_slug=server,
+                server_region=self.region_var.get().strip() or "eu",
+                difficulty_id=difficulty_id,
+                season_start=self.season_start_var.get().strip() or None,
+                season_end=self.season_end_var.get().strip() or None,
+                max_reports=max_reports or None,
+                fight=self.fight_var.get().strip() or "boss",
+                include_trash=self.include_trash_var.get(),
+                tables=self.tables_var.get().strip() or "standard",
+                events=self.events_var.get().strip() or "standard",
+                filter_expression=self.filter_var.get().strip() or None,
+                out=Path(self.out_var.get().strip() or "exports"),
+                make_zip=self.zip_var.get(),
+                limit=limit,
+                max_pages=max_pages,
+                allow_unlisted=self.allow_unlisted_var.get(),
+                client_id=self.client_id_var.get().strip() or None,
+                client_secret=self.client_secret_var.get().strip() or None,
+            )
 
         return DownloadOptions(
             report=report,
@@ -187,9 +257,10 @@ class LogVaultApp:
             allow_unlisted=self.allow_unlisted_var.get(),
             client_id=self.client_id_var.get().strip() or None,
             client_secret=self.client_secret_var.get().strip() or None,
+            difficulty_id=difficulty_id,
         )
 
-    def _save_env(self, options: DownloadOptions) -> None:
+    def _save_env(self, options: DownloadOptions | CharacterReportsOptions) -> None:
         lines = [
             "# Warcraft Logs OAuth client credentials.",
             f"WCL_CLIENT_ID={options.client_id or ''}",
@@ -197,9 +268,12 @@ class LogVaultApp:
         ]
         Path(".env").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
-    def _download_worker(self, options: DownloadOptions) -> None:
+    def _download_worker(self, options: DownloadOptions | CharacterReportsOptions) -> None:
         try:
-            result = download_report(options, progress=lambda message: self.messages.put(("log", message)))
+            if isinstance(options, CharacterReportsOptions):
+                result = download_character_reports(options, progress=lambda message: self.messages.put(("log", message)))
+            else:
+                result = download_report(options, progress=lambda message: self.messages.put(("log", message)))
         except (LogVaultError, ValueError) as exc:
             self.messages.put(("error", str(exc)))
         except Exception as exc:  # pragma: no cover - defensive GUI boundary.
@@ -255,6 +329,16 @@ def parse_positive_int(value: str, label: str) -> int:
         raise ValueError(f"{label} must be an integer.") from exc
     if parsed <= 0:
         raise ValueError(f"{label} must be greater than zero.")
+    return parsed
+
+
+def parse_non_negative_int(value: str, label: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise ValueError(f"{label} must be an integer.") from exc
+    if parsed < 0:
+        raise ValueError(f"{label} must be zero or greater.")
     return parsed
 
 
