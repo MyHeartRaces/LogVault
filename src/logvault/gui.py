@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import queue
+import sys
 import threading
 import webbrowser
 from pathlib import Path
@@ -28,6 +29,8 @@ class LogVaultApp:
     def __init__(self, root: Any) -> None:
         self.root = root
         self.root.title("LogVault - Warcraft Logs Exporter")
+        self.icon_image: Any | None = None
+        self._set_window_icon()
         self.root.geometry("960x820")
         self.root.minsize(820, 720)
 
@@ -77,6 +80,19 @@ class LogVaultApp:
             "line": "#384452",
         }
         self.root.configure(bg=self.colors["bg"])
+        self.root.option_add("*Background", self.colors["panel"])
+        self.root.option_add("*Foreground", self.colors["text"])
+        self.root.option_add("*selectBackground", self.colors["gold"])
+        self.root.option_add("*selectForeground", "#17120a")
+        self.root.option_add("*insertBackground", self.colors["text"])
+        self.root.option_add("*Listbox.background", "#0f1318")
+        self.root.option_add("*Listbox.foreground", self.colors["text"])
+        self.root.option_add("*Listbox.selectBackground", self.colors["gold"])
+        self.root.option_add("*Listbox.selectForeground", "#17120a")
+        self.root.option_add("*TCombobox*Listbox.background", "#0f1318")
+        self.root.option_add("*TCombobox*Listbox.foreground", self.colors["text"])
+        self.root.option_add("*TCombobox*Listbox.selectBackground", self.colors["gold"])
+        self.root.option_add("*TCombobox*Listbox.selectForeground", "#17120a")
         style = ttk.Style(self.root)
         try:
             style.theme_use("clam")
@@ -102,27 +118,113 @@ class LogVaultApp:
         )
         style.configure(
             "TEntry",
+            background="#0f1318",
             fieldbackground="#0f1318",
             foreground=self.colors["text"],
             bordercolor=self.colors["line"],
+            lightcolor=self.colors["line"],
+            darkcolor="#0a0d11",
             insertcolor=self.colors["text"],
+            padding=(6, 4),
+        )
+        style.map(
+            "TEntry",
+            fieldbackground=[
+                ("disabled", "#151a20"),
+                ("readonly", "#0f1318"),
+                ("focus", "#0f1318"),
+                ("active", "#0f1318"),
+            ],
+            foreground=[("disabled", "#6f7984"), ("readonly", self.colors["text"])],
+            bordercolor=[("focus", self.colors["gold"]), ("active", self.colors["blue"])],
         )
         style.configure(
             "TCombobox",
+            background="#0f1318",
             fieldbackground="#0f1318",
             foreground=self.colors["text"],
             bordercolor=self.colors["line"],
             arrowcolor=self.colors["gold"],
+            lightcolor=self.colors["line"],
+            darkcolor="#0a0d11",
+            selectbackground=self.colors["gold"],
+            selectforeground="#17120a",
+            padding=(6, 4),
+        )
+        style.map(
+            "TCombobox",
+            background=[
+                ("pressed", "#202832"),
+                ("active", "#202832"),
+                ("readonly", "#0f1318"),
+                ("disabled", "#151a20"),
+            ],
+            fieldbackground=[
+                ("pressed", "#0f1318"),
+                ("active", "#0f1318"),
+                ("readonly", "#0f1318"),
+                ("focus", "#0f1318"),
+                ("disabled", "#151a20"),
+            ],
+            foreground=[("disabled", "#6f7984"), ("readonly", self.colors["text"])],
+            arrowcolor=[
+                ("pressed", self.colors["gold_light"]),
+                ("active", self.colors["gold_light"]),
+                ("disabled", "#6f7984"),
+            ],
+            bordercolor=[("focus", self.colors["gold"]), ("active", self.colors["blue"])],
         )
         style.configure(
             "TCheckbutton",
             background=self.colors["panel"],
             foreground=self.colors["text"],
+            focuscolor=self.colors["panel"],
+            indicatorbackground="#0f1318",
+            indicatorforeground=self.colors["gold"],
+        )
+        style.map(
+            "TCheckbutton",
+            background=[("active", self.colors["panel"]), ("pressed", self.colors["panel_alt"])],
+            foreground=[("disabled", "#6f7984"), ("active", self.colors["gold_light"])],
+            indicatorbackground=[
+                ("selected", self.colors["gold"]),
+                ("pressed", self.colors["panel_alt"]),
+                ("active", "#202832"),
+            ],
         )
         style.configure(
             "TRadiobutton",
             background=self.colors["panel"],
             foreground=self.colors["text"],
+            focuscolor=self.colors["panel"],
+            indicatorbackground="#0f1318",
+            indicatorforeground=self.colors["gold"],
+        )
+        style.map(
+            "TRadiobutton",
+            background=[("active", self.colors["panel"]), ("pressed", self.colors["panel_alt"])],
+            foreground=[("disabled", "#6f7984"), ("active", self.colors["gold_light"])],
+            indicatorbackground=[
+                ("selected", self.colors["gold"]),
+                ("pressed", self.colors["panel_alt"]),
+                ("active", "#202832"),
+            ],
+        )
+        style.configure(
+            "TButton",
+            background=self.colors["panel_alt"],
+            foreground=self.colors["text"],
+            bordercolor=self.colors["line"],
+            lightcolor=self.colors["line"],
+            darkcolor="#0a0d11",
+            focuscolor=self.colors["panel_alt"],
+            padding=(12, 7),
+        )
+        style.map(
+            "TButton",
+            background=[("pressed", "#141a21"), ("active", "#263140"), ("disabled", "#151a20")],
+            foreground=[("disabled", "#6f7984"), ("active", self.colors["text"])],
+            bordercolor=[("focus", self.colors["gold"]), ("active", self.colors["blue"])],
         )
         style.configure(
             "Accent.TButton",
@@ -134,10 +236,35 @@ class LogVaultApp:
         )
         style.map(
             "Accent.TButton",
-            background=[("active", self.colors["gold_light"]), ("disabled", "#5f5131")],
+            background=[
+                ("pressed", "#b47a24"),
+                ("active", self.colors["gold_light"]),
+                ("disabled", "#5f5131"),
+            ],
             foreground=[("disabled", "#a9a9a9")],
+            bordercolor=[("focus", self.colors["gold_light"]), ("active", self.colors["gold_light"])],
         )
-        style.configure("TButton", padding=(12, 7))
+        style.configure(
+            "Horizontal.TProgressbar",
+            background=self.colors["gold"],
+            troughcolor="#0f1318",
+            bordercolor=self.colors["line"],
+            lightcolor=self.colors["gold_light"],
+            darkcolor="#8a5417",
+        )
+        style.configure("ComboboxPopdownFrame", background="#0f1318", bordercolor=self.colors["line"])
+
+    def _set_window_icon(self) -> None:
+        try:
+            png_path = asset_path("logvault.png")
+            if png_path.exists():
+                self.icon_image = tk.PhotoImage(file=str(png_path))
+                self.root.iconphoto(True, self.icon_image)
+            ico_path = asset_path("logvault.ico")
+            if os.name == "nt" and ico_path.exists():
+                self.root.iconbitmap(default=str(ico_path))
+        except (OSError, tk.TclError):
+            self.icon_image = None
 
     def _build(self) -> None:
         root_frame = ttk.Frame(self.root, padding=14)
@@ -481,6 +608,13 @@ def parse_non_negative_int(value: str, label: str) -> int:
     if parsed < 0:
         raise ValueError(f"{label} must be zero or greater.")
     return parsed
+
+
+def asset_path(name: str) -> Path:
+    base = getattr(sys, "_MEIPASS", None)
+    if base:
+        return Path(base) / "assets" / name
+    return Path(__file__).resolve().parents[2] / "assets" / name
 
 
 def main() -> int:

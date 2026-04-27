@@ -249,8 +249,8 @@ chmod +x scripts/build_unix.sh
 GitHub Actions also builds Windows, Linux, macOS, installer, app, and Arch package artifacts on tags:
 
 ```bash
-git tag v0.5.0
-git push origin v0.5.0
+git tag v0.5.1
+git push origin v0.5.1
 ```
 
 ## Tests

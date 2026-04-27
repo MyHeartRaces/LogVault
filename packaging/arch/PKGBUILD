@@ -1,6 +1,6 @@
 # Maintainer: LogVault
 pkgname=logvault
-pkgver=0.5.0
+pkgver=0.5.1
 pkgrel=1
 pkgdesc="GUI downloader/exporter for Warcraft Logs reports"
 arch=("any")
@@ -14,7 +14,7 @@ package() {
   cd "$srcdir/LogVault-${pkgver}"
 
   install -d "$pkgdir/usr/lib/logvault"
-  cp -a src run_cli.py run_gui.py pyproject.toml README.md "$pkgdir/usr/lib/logvault/"
+  cp -a assets src run_cli.py run_gui.py pyproject.toml README.md "$pkgdir/usr/lib/logvault/"
 
   install -d "$pkgdir/usr/bin"
   cat > "$pkgdir/usr/bin/logvault-gui" <<'EOF'

@@ -20,6 +20,7 @@ mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources" "$ROOT/$RELEASE
 rm -f "$ROOT/$RELEASE_DIR/LogVault-macos-arm64.app.zip" "$ROOT/$RELEASE_DIR/LogVault-macos-arm64.dmg"
 install -m 755 "$BINARY" "$APP_DIR/Contents/MacOS/LogVault"
 install -m 644 "$ROOT/assets/logvault.svg" "$APP_DIR/Contents/Resources/logvault.svg"
+install -m 644 "$ROOT/assets/logvault.icns" "$APP_DIR/Contents/Resources/logvault.icns"
 
 cat > "$APP_DIR/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -38,6 +39,8 @@ cat > "$APP_DIR/Contents/Info.plist" <<EOF
   <string>LogVault</string>
   <key>CFBundleDisplayName</key>
   <string>LogVault</string>
+  <key>CFBundleIconFile</key>
+  <string>logvault.icns</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
