@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from .api import WarcraftLogsClient
-from .cli_defaults import DEFAULT_EVENT_TYPES, DEFAULT_TABLE_TYPES
+from .cli_defaults import DEFAULT_EVENT_TYPES, DEFAULT_TABLE_TYPES, ESSENTIAL_EVENT_TYPES, FULL_EVENT_TYPES
 from .difficulty import difficulty_label
 from .env import load_env_file
 from .exporter import export_bundle, fresh_output_dir
@@ -23,7 +23,7 @@ class DownloadOptions:
     fight: str | None = None
     include_trash: bool = False
     tables: str = "standard"
-    events: str = "standard"
+    events: str = "compact"
     filter_expression: str | None = None
     out: Path = Path("exports")
     make_zip: bool = True
@@ -81,7 +81,7 @@ def download_report(options: DownloadOptions, progress: ProgressCallback | None 
     start_time, end_time = selected_time_window(fights, fight_ids)
 
     table_types = resolve_type_list(options.tables, DEFAULT_TABLE_TYPES)
-    event_types = resolve_type_list(options.events, DEFAULT_EVENT_TYPES)
+    event_types = resolve_event_type_list(options.events)
     progress(
         f"Selected fights: {', '.join(str(fight_id) for fight_id in fight_ids)}; "
         f"tables: {len(table_types)}; event streams: {len(event_types)}"
@@ -153,6 +153,17 @@ def resolve_type_list(value: str, standard: list[str]) -> list[str]:
         return []
     if normalized in {"standard", "default"}:
         return list(standard)
+    return parse_list(value)
+
+
+def resolve_event_type_list(value: str) -> list[str]:
+    normalized = value.strip().lower()
+    if normalized in {"", "none", "off", "false", "0", "compact", "standard", "default"}:
+        return list(DEFAULT_EVENT_TYPES)
+    if normalized in {"essential", "analysis"}:
+        return list(ESSENTIAL_EVENT_TYPES)
+    if normalized in {"full", "raw", "all"}:
+        return list(FULL_EVENT_TYPES)
     return parse_list(value)
 
 

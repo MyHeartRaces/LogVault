@@ -13,7 +13,7 @@ Each report bundle contains:
 - `summary.md` - a human-readable overview of the selected fights.
 - `fights.csv`, `actors.csv`, `abilities.csv` - report reference data.
 - `tables/*.csv` and `tables/*.json` - aggregate Warcraft Logs tables such as damage, healing, casts, deaths, interrupts, buffs, debuffs, and resources.
-- `events/*.jsonl` and `events/*.csv` - raw events, one event per JSONL line.
+- `events/*.jsonl` and `events/*.csv` - optional raw events. Disabled by default to keep bundles small.
 - A `.zip` archive next to the export folder for easy sharing.
 
 Character batch exports also include:
@@ -101,6 +101,8 @@ logvault-gui
 
 Single report mode downloads one Warcraft Logs report URL or report code. Character reports mode downloads recent reports for a character, filters them by season dates, then exports fights matching the selected difficulty.
 
+The default event mode is `compact`, which exports tables and summaries but no raw event streams. Use `essential` for deaths/interrupts/dispels/combatant info, or `full` only when you really need raw per-event data. Full event exports can be hundreds of megabytes per report.
+
 Character fields:
 
 - `Character` - character name.
@@ -139,6 +141,18 @@ Fast export without raw events:
 
 ```bash
 logvault REPORTCODE --events none
+```
+
+Export a small event subset:
+
+```bash
+logvault REPORTCODE --events essential
+```
+
+Export all raw event streams:
+
+```bash
+logvault REPORTCODE --events full
 ```
 
 Download all available Mythic reports for a character in a season:

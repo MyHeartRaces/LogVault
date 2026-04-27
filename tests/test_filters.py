@@ -2,6 +2,7 @@ import unittest
 
 from logvault.dates import parse_date_bound, report_timestamp_seconds
 from logvault.difficulty import difficulty_label, parse_difficulty
+from logvault.download import resolve_event_type_list
 
 
 class FilterTests(unittest.TestCase):
@@ -21,7 +22,11 @@ class FilterTests(unittest.TestCase):
     def test_report_timestamp_seconds_accepts_ms(self):
         self.assertEqual(report_timestamp_seconds(1_700_000_000_000), 1_700_000_000)
 
+    def test_event_presets(self):
+        self.assertEqual(resolve_event_type_list("compact"), [])
+        self.assertIn("Deaths", resolve_event_type_list("essential"))
+        self.assertIn("DamageDone", resolve_event_type_list("full"))
+
 
 if __name__ == "__main__":
     unittest.main()
-

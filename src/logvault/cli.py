@@ -59,8 +59,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--events",
-        default="standard",
-        help="Comma-separated EventDataType values, 'standard', or 'none'. Default: standard.",
+        default="compact",
+        help=(
+            "Event export preset: compact/none, essential, full, or comma-separated EventDataType values. "
+            "Default: compact. full can create very large folders."
+        ),
     )
     parser.add_argument("--filter", help="Optional Warcraft Logs filterExpression applied to events.")
     parser.add_argument("--out", default="exports", help="Output directory. Default: exports.")

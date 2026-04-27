@@ -51,7 +51,7 @@ class LogVaultApp:
         self.client_secret_var = tk.StringVar(value=os.getenv("WCL_CLIENT_SECRET", ""))
         self.save_env_var = tk.BooleanVar(value=False)
         self.tables_var = tk.StringVar(value="standard")
-        self.events_var = tk.StringVar(value="standard")
+        self.events_var = tk.StringVar(value="compact")
         self.filter_var = tk.StringVar()
         self.out_var = tk.StringVar(value="exports")
         self.zip_var = tk.BooleanVar(value=True)
@@ -211,7 +211,7 @@ class LogVaultApp:
             row=0, column=1, sticky="ew", padx=6, pady=6
         )
         self._label(export, "Events", 0, 2)
-        ttk.Combobox(export, textvariable=self.events_var, values=("standard", "none"), width=24).grid(
+        ttk.Combobox(export, textvariable=self.events_var, values=("compact", "essential", "full", "none"), width=24).grid(
             row=0, column=3, sticky="ew", padx=6, pady=6
         )
         self._label(export, "Filter", 1, 0)

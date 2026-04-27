@@ -81,7 +81,7 @@ def build_metadata(*, report: dict[str, Any], fight_ids: list[int], source_url: 
             "actors": "actors.csv",
             "abilities": "abilities.csv",
             "tables": "tables/*.json and tables/*.csv",
-            "events": "events/*.jsonl and events/*.csv",
+            "events": "events/*.jsonl and events/*.csv when event export is enabled",
         },
     }
 
@@ -134,7 +134,7 @@ def render_summary(
             ["type", "events"],
         ))
     else:
-        lines.append("Event export was disabled.")
+        lines.append("Raw event export was disabled. This is the compact default.")
 
     lines.extend([
         "",
@@ -142,8 +142,8 @@ def render_summary(
         "",
         "- `summary.md` is the quick human-readable overview.",
         "- `tables/*.csv` contains aggregate Warcraft Logs tables such as damage, healing, deaths, casts, interrupts.",
-        "- `events/*.jsonl` contains one raw event per line for detailed analysis.",
-        "- `events/*.csv` contains the same events with common columns plus a raw JSON column.",
+        "- `events/*.jsonl` contains one raw event per line when event export is enabled.",
+        "- `events/*.csv` contains common event columns when event export is enabled.",
     ])
     return "\n".join(lines) + "\n"
 
@@ -218,7 +218,7 @@ def table_rows(value: Any) -> list[dict[str, Any]]:
 
 def write_events(jsonl_path: Path, csv_path: Path, events: Iterable[dict[str, Any]]) -> int:
     count = 0
-    fieldnames = ["timestamp", "type", "sourceID", "targetID", "abilityGameID", "ability", "amount", "hitType", "raw"]
+    fieldnames = ["timestamp", "type", "sourceID", "targetID", "abilityGameID", "ability", "amount", "hitType"]
     with jsonl_path.open("w", encoding="utf-8") as jsonl, csv_path.open("w", encoding="utf-8", newline="") as csv_file:
         writer = csv.DictWriter(csv_file, fieldnames=fieldnames, extrasaction="ignore")
         writer.writeheader()
@@ -240,7 +240,6 @@ def event_common_row(event: dict[str, Any]) -> dict[str, Any]:
         "ability": event.get("ability"),
         "amount": event.get("amount"),
         "hitType": event.get("hitType"),
-        "raw": json.dumps(event, ensure_ascii=False, sort_keys=True),
     }
 
 

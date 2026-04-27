@@ -13,7 +13,7 @@ LogVault скачивает отчеты World of Warcraft через Warcraft L
 - `summary.md` - короткий обзор выбранных боев.
 - `fights.csv`, `actors.csv`, `abilities.csv` - справочники отчета.
 - `tables/*.csv` и `tables/*.json` - агрегированные таблицы Warcraft Logs: урон, лечение, касты, смерти, прерывания, баффы, дебаффы, ресурсы.
-- `events/*.jsonl` и `events/*.csv` - сырые события, по одному событию на строку.
+- `events/*.jsonl` и `events/*.csv` - опциональные сырые события. По умолчанию отключены, чтобы пакет не раздувался.
 - `.zip` рядом с папкой экспорта.
 
 При массовой выгрузке персонажа дополнительно создаются:
@@ -103,6 +103,8 @@ logvault-gui
 
 `Character reports` скачивает recent reports персонажа, фильтрует их по датам сезона, а внутри каждого отчета выгружает только бои выбранной сложности.
 
+Режим событий по умолчанию - `compact`: сохраняются таблицы и summary, но не сырые event streams. `essential` выгружает небольшой набор событий: deaths, interrupts, dispels, combatant info. `full` включает все сырые события и может дать сотни мегабайт на один отчет.
+
 Поля режима персонажа:
 
 - `Character` - имя персонажа.
@@ -141,6 +143,18 @@ logvault REPORTCODE --fight all
 
 ```bash
 logvault REPORTCODE --events none
+```
+
+Выгрузить небольшой набор событий:
+
+```bash
+logvault REPORTCODE --events essential
+```
+
+Выгрузить все сырые события:
+
+```bash
+logvault REPORTCODE --events full
 ```
 
 Скачать все доступные Mythic-отчеты персонажа за сезон:
@@ -220,4 +234,3 @@ PYTHONPATH=src python3 -m unittest discover -s tests -p 'test_*.py'
 ## Лицензия
 
 LogVault распространяется как open source под [MIT License](LICENSE).
-

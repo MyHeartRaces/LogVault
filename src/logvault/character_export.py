@@ -28,7 +28,7 @@ class CharacterReportsOptions:
     fight: str | None = "boss"
     include_trash: bool = False
     tables: str = "standard"
-    events: str = "standard"
+    events: str = "compact"
     filter_expression: str | None = None
     out: Path = Path("exports")
     make_zip: bool = True
@@ -285,4 +285,3 @@ def write_character_index(
 
 def escape_md(value: Any) -> str:
     return str(value).replace("|", "\\|").replace("\n", " ")
-

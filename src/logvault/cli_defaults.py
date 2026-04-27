@@ -12,7 +12,16 @@ DEFAULT_TABLE_TYPES = [
     "Resources",
 ]
 
-DEFAULT_EVENT_TYPES = [
+DEFAULT_EVENT_TYPES = []
+
+ESSENTIAL_EVENT_TYPES = [
+    "Deaths",
+    "Interrupts",
+    "Dispels",
+    "CombatantInfo",
+]
+
+FULL_EVENT_TYPES = [
     "DamageDone",
     "DamageTaken",
     "Healing",
@@ -25,4 +34,3 @@ DEFAULT_EVENT_TYPES = [
     "CombatantInfo",
     "Resources",
 ]
-
