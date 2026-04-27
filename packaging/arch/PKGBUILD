@@ -1,6 +1,6 @@
 # Maintainer: LogVault
 pkgname=logvault
-pkgver=0.2.0
+pkgver=0.3.0
 pkgrel=1
 pkgdesc="GUI downloader/exporter for Warcraft Logs reports"
 arch=("any")
@@ -29,4 +29,5 @@ EOF
 
   install -Dm644 packaging/linux/logvault.desktop "$pkgdir/usr/share/applications/logvault.desktop"
   install -Dm644 assets/logvault.svg "$pkgdir/usr/share/icons/hicolor/scalable/apps/logvault.svg"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
 }

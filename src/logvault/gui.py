@@ -27,7 +27,7 @@ from .errors import LogVaultError
 class LogVaultApp:
     def __init__(self, root: Any) -> None:
         self.root = root
-        self.root.title("LogVault")
+        self.root.title("LogVault - Warcraft Logs Exporter")
         self.root.geometry("960x820")
         self.root.minsize(820, 720)
 
@@ -59,19 +59,94 @@ class LogVaultApp:
         self.limit_var = tk.StringVar(value="10000")
         self.max_pages_var = tk.StringVar()
 
+        self._configure_style()
         self._build()
         self._poll_messages()
 
+    def _configure_style(self) -> None:
+        self.colors = {
+            "bg": "#111418",
+            "panel": "#1a2027",
+            "panel_alt": "#202832",
+            "text": "#ecf0f3",
+            "muted": "#aeb8c2",
+            "gold": "#d8a640",
+            "gold_light": "#f1d179",
+            "blue": "#6aa9e8",
+            "line": "#384452",
+        }
+        self.root.configure(bg=self.colors["bg"])
+        style = ttk.Style(self.root)
+        try:
+            style.theme_use("clam")
+        except tk.TclError:
+            pass
+
+        style.configure("TFrame", background=self.colors["bg"])
+        style.configure("Panel.TFrame", background=self.colors["panel"])
+        style.configure("TLabel", background=self.colors["panel"], foreground=self.colors["text"])
+        style.configure("Muted.TLabel", background=self.colors["panel"], foreground=self.colors["muted"])
+        style.configure(
+            "TLabelframe",
+            background=self.colors["panel"],
+            foreground=self.colors["gold_light"],
+            bordercolor=self.colors["line"],
+            relief="solid",
+        )
+        style.configure(
+            "TLabelframe.Label",
+            background=self.colors["bg"],
+            foreground=self.colors["gold_light"],
+            font=("TkDefaultFont", 11, "bold"),
+        )
+        style.configure(
+            "TEntry",
+            fieldbackground="#0f1318",
+            foreground=self.colors["text"],
+            bordercolor=self.colors["line"],
+            insertcolor=self.colors["text"],
+        )
+        style.configure(
+            "TCombobox",
+            fieldbackground="#0f1318",
+            foreground=self.colors["text"],
+            bordercolor=self.colors["line"],
+            arrowcolor=self.colors["gold"],
+        )
+        style.configure(
+            "TCheckbutton",
+            background=self.colors["panel"],
+            foreground=self.colors["text"],
+        )
+        style.configure(
+            "TRadiobutton",
+            background=self.colors["panel"],
+            foreground=self.colors["text"],
+        )
+        style.configure(
+            "Accent.TButton",
+            background=self.colors["gold"],
+            foreground="#17120a",
+            font=("TkDefaultFont", 10, "bold"),
+            borderwidth=0,
+            padding=(14, 8),
+        )
+        style.map(
+            "Accent.TButton",
+            background=[("active", self.colors["gold_light"]), ("disabled", "#5f5131")],
+            foreground=[("disabled", "#a9a9a9")],
+        )
+        style.configure("TButton", padding=(12, 7))
+
     def _build(self) -> None:
-        root_frame = ttk.Frame(self.root, padding=12)
+        root_frame = ttk.Frame(self.root, padding=14)
         root_frame.grid(row=0, column=0, sticky="nsew")
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
         root_frame.columnconfigure(0, weight=1)
         root_frame.rowconfigure(5, weight=1)
 
-        title = ttk.Label(root_frame, text="LogVault", font=("TkDefaultFont", 18, "bold"))
-        title.grid(row=0, column=0, sticky="w")
+        self._wordmark(root_frame).grid(row=0, column=0, sticky="ew", pady=(0, 12))
 
         source = ttk.LabelFrame(root_frame, text="Report")
         source.grid(row=1, column=0, sticky="ew", pady=(12, 8))
@@ -158,7 +233,7 @@ class LogVaultApp:
         actions = ttk.Frame(root_frame)
         actions.grid(row=4, column=0, sticky="ew", pady=(8, 6))
         actions.columnconfigure(2, weight=1)
-        self.download_button = ttk.Button(actions, text="Download", command=self._start_download)
+        self.download_button = ttk.Button(actions, text="Download", style="Accent.TButton", command=self._start_download)
         self.download_button.grid(row=0, column=0, sticky="w")
         self.open_button = ttk.Button(actions, text="Open output folder", command=self._open_output, state="disabled")
         self.open_button.grid(row=0, column=1, sticky="w", padx=(8, 0))
@@ -170,7 +245,60 @@ class LogVaultApp:
         log_frame.columnconfigure(0, weight=1)
         log_frame.rowconfigure(0, weight=1)
         self.log = scrolledtext.ScrolledText(log_frame, height=14, wrap="word", state="disabled")
+        self.log.configure(
+            background="#0c1015",
+            foreground=self.colors["text"],
+            insertbackground=self.colors["text"],
+            relief="flat",
+            borderwidth=0,
+            font=("Menlo", 11),
+        )
         self.log.grid(row=0, column=0, sticky="nsew", padx=6, pady=6)
+
+    def _wordmark(self, parent: Any) -> Any:
+        canvas = tk.Canvas(parent, height=122, bg=self.colors["bg"], bd=0, highlightthickness=0)
+
+        def draw(_event=None) -> None:
+            canvas.delete("all")
+            width = max(canvas.winfo_width(), 760)
+            left = 10
+            right = width - 10
+            center = width / 2
+            canvas.create_rectangle(left, 24, right, 105, fill="#161b22", outline="#61441d", width=3)
+            canvas.create_line(left + 18, 40, right - 18, 40, fill="#b7802d", width=1)
+            canvas.create_line(left + 18, 88, right - 18, 88, fill="#b7802d", width=1)
+            for x in (left + 42, right - 42):
+                canvas.create_polygon(
+                    x, 14, x + 22, 64, x, 114, x - 22, 64,
+                    fill="#0c1015",
+                    outline=self.colors["gold"],
+                    width=3,
+                )
+            canvas.create_text(
+                center + 3,
+                72,
+                text="LogVault",
+                fill="#050505",
+                font=("Georgia", 42, "bold"),
+            )
+            canvas.create_text(
+                center,
+                68,
+                text="LogVault",
+                fill=self.colors["gold_light"],
+                font=("Georgia", 42, "bold"),
+            )
+            canvas.create_text(
+                center,
+                103,
+                text="WARCRAFT LOGS EXPORTER",
+                fill=self.colors["blue"],
+                font=("TkDefaultFont", 10, "bold"),
+            )
+
+        canvas.bind("<Configure>", draw)
+        canvas.after_idle(draw)
+        return canvas
 
     def _label(self, parent: Any, text: str, row: int, column: int) -> None:
         ttk.Label(parent, text=text).grid(row=row, column=column, sticky="w", padx=(8, 0), pady=6)

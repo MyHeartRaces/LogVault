@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="220" viewBox="0 0 920 220" role="img" aria-labelledby="title desc">
+  <title id="title">LogVault wordmark</title>
+  <desc id="desc">A gothic fantasy wordmark for the LogVault Warcraft Logs exporter.</desc>
+  <defs>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff2a8"/>
+      <stop offset="0.35" stop-color="#d59b32"/>
+      <stop offset="0.72" stop-color="#8a5417"/>
+      <stop offset="1" stop-color="#f2c768"/>
+    </linearGradient>
+    <linearGradient id="steel" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1f2933"/>
+      <stop offset="1" stop-color="#0b0d10"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-25%" width="120%" height="160%">
+      <feDropShadow dx="0" dy="7" stdDeviation="5" flood-color="#000" flood-opacity="0.72"/>
+      <feDropShadow dx="0" dy="0" stdDeviation="2" flood-color="#ffd66d" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+
+  <rect x="18" y="52" width="884" height="112" rx="14" fill="url(#steel)" stroke="#5a3a16" stroke-width="4"/>
+  <path d="M34 72h852M34 144h852" stroke="#c48a2a" stroke-width="2" opacity="0.65"/>
+  <path d="M70 45l24 34-24 34-24-34zM850 45l24 34-24 34-24-34z" fill="#0b0d10" stroke="#d4a645" stroke-width="5"/>
+  <path d="M92 112l26 26-26 26-26-26zM828 112l26 26-26 26-26-26z" fill="#111820" stroke="#6aa9e8" stroke-width="4"/>
+
+  <text x="460" y="136"
+        text-anchor="middle"
+        font-family="Cinzel Decorative, Friz Quadrata, Georgia, Times New Roman, serif"
+        font-size="86"
+        font-weight="900"
+        letter-spacing="2"
+        fill="#18110a"
+        stroke="#070505"
+        stroke-width="12"
+        paint-order="stroke fill"
+        filter="url(#shadow)">LogVault</text>
+  <text x="460" y="136"
+        text-anchor="middle"
+        font-family="Cinzel Decorative, Friz Quadrata, Georgia, Times New Roman, serif"
+        font-size="86"
+        font-weight="900"
+        letter-spacing="2"
+        fill="url(#gold)"
+        stroke="#f8e6a0"
+        stroke-width="1.5">LogVault</text>
+  <text x="460" y="178"
+        text-anchor="middle"
+        font-family="Georgia, Times New Roman, serif"
+        font-size="20"
+        font-weight="700"
+        letter-spacing="5"
+        fill="#9fb8d1">WARCRAFT LOGS EXPORTER</text>
+</svg>
+
