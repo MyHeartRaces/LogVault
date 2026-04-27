@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+import shutil
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -32,6 +33,7 @@ class CharacterReportsOptions:
     filter_expression: str | None = None
     out: Path = Path("exports")
     make_zip: bool = True
+    archive_only: bool = False
     limit: int = 10_000
     max_pages: int | None = None
     allow_unlisted: bool = True
@@ -56,6 +58,8 @@ def download_character_reports(
     progress=None,
 ) -> CharacterReportsResult:
     progress = progress or (lambda _message: None)
+    if options.archive_only and not options.make_zip:
+        raise ValueError("Archive-only output requires zip archive creation.")
     if options.env_file is not None:
         load_env_file(options.env_file)
 
@@ -142,6 +146,8 @@ def download_character_reports(
         skipped=skipped,
     )
     archive = zip_bundle(out_dir) if options.make_zip else None
+    if archive is not None and options.archive_only:
+        shutil.rmtree(out_dir)
     return CharacterReportsResult(
         out_dir=out_dir,
         archive=archive,

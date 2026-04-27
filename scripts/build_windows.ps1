@@ -28,3 +28,12 @@ $Python = Join-Path $Root ".venv-build\Scripts\python.exe"
 & $Python -m PyInstaller --clean --noconfirm LogVault.spec
 
 Write-Host "Built: $Root\dist\LogVault.exe"
+
+$Inno = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+if (Test-Path $Inno) {
+    $Version = & $Python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])"
+    & $Inno "/DAppVersion=$Version" "packaging\windows\LogVault.iss"
+    Write-Host "Built installer: $Root\installer\LogVault-Setup-$Version-x64.exe"
+} else {
+    Write-Host "Inno Setup not found; skipped installer build."
+}

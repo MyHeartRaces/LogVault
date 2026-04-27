@@ -62,12 +62,17 @@ def build_parser() -> argparse.ArgumentParser:
         default="compact",
         help=(
             "Event export preset: compact/none, essential, full, or comma-separated EventDataType values. "
-            "Default: compact. full can create very large folders."
+            "Default: compact. full can still create very large exports."
         ),
     )
     parser.add_argument("--filter", help="Optional Warcraft Logs filterExpression applied to events.")
     parser.add_argument("--out", default="exports", help="Output directory. Default: exports.")
     parser.add_argument("--no-zip", action="store_true", help="Do not create a .zip archive next to the output folder.")
+    parser.add_argument(
+        "--archive-only",
+        action="store_true",
+        help="Create the .zip bundle and remove the extracted folder after export.",
+    )
     parser.add_argument(
         "--limit",
         type=int,
@@ -113,6 +118,7 @@ def run_download(args: argparse.Namespace) -> int:
                 filter_expression=args.filter,
                 out=Path(args.out),
                 make_zip=not args.no_zip,
+                archive_only=args.archive_only,
                 limit=args.limit,
                 max_pages=args.max_pages or None,
                 allow_unlisted=not args.no_allow_unlisted,
@@ -123,7 +129,7 @@ def run_download(args: argparse.Namespace) -> int:
             ),
             progress=lambda message: print(message, file=sys.stderr),
         )
-        print(f"Done: {result.out_dir}")
+        print(f"Done: {primary_output(result.out_dir, result.archive)}")
         if result.archive:
             print(f"Archive: {result.archive}")
         print(f"Exported reports: {len(result.downloaded)}; skipped: {len(result.skipped)}")
@@ -142,6 +148,7 @@ def run_download(args: argparse.Namespace) -> int:
             filter_expression=args.filter,
             out=Path(args.out),
             make_zip=not args.no_zip,
+            archive_only=args.archive_only,
             limit=args.limit,
             max_pages=args.max_pages or None,
             allow_unlisted=not args.no_allow_unlisted,
@@ -154,7 +161,15 @@ def run_download(args: argparse.Namespace) -> int:
         progress=lambda message: print(message, file=sys.stderr),
     )
 
-    print(f"Done: {result.out_dir}")
+    print(f"Done: {primary_output(result.out_dir, result.archive)}")
     if result.archive:
         print(f"Archive: {result.archive}")
     return 0
+
+
+def primary_output(out_dir: Path, archive: Path | None) -> Path:
+    if out_dir.exists():
+        return out_dir
+    if archive is not None:
+        return archive
+    return out_dir

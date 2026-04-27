@@ -1,3 +1,4 @@
+import gzip
 import tempfile
 import unittest
 from pathlib import Path
@@ -40,11 +41,39 @@ class ExporterTests(unittest.TestCase):
 
             self.assertTrue((out_dir / "summary.md").exists())
             self.assertTrue((out_dir / "tables" / "DamageDone.csv").exists())
-            self.assertTrue((out_dir / "events" / "Deaths.jsonl").exists())
+            events_path = out_dir / "events" / "Deaths.jsonl.gz"
+            self.assertTrue(events_path.exists())
+            with gzip.open(events_path, "rt", encoding="utf-8") as file:
+                self.assertIn('"type": "death"', file.read())
+            self.assertIsNotNone(archive)
+            self.assertTrue(archive.exists())
+
+    def test_archive_only_removes_extracted_bundle(self):
+        report = {
+            "code": "abc",
+            "title": "Test Report",
+            "owner": {"name": "Tester"},
+            "zone": {"name": "Test Zone"},
+            "fights": [],
+            "masterData": {"actors": [], "abilities": []},
+        }
+
+        with tempfile.TemporaryDirectory() as temp:
+            out_dir, archive = export_bundle(
+                out_dir=Path(temp) / "bundle",
+                report=report,
+                fight_ids=[],
+                tables={},
+                events_by_type={},
+                source_url="abc",
+                make_zip=True,
+                archive_only=True,
+            )
+
+            self.assertFalse(out_dir.exists())
             self.assertIsNotNone(archive)
             self.assertTrue(archive.exists())
 
 
 if __name__ == "__main__":
     unittest.main()
-

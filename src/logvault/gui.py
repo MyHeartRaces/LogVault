@@ -55,6 +55,7 @@ class LogVaultApp:
         self.filter_var = tk.StringVar()
         self.out_var = tk.StringVar(value="exports")
         self.zip_var = tk.BooleanVar(value=True)
+        self.archive_only_var = tk.BooleanVar(value=True)
         self.allow_unlisted_var = tk.BooleanVar(value=True)
         self.limit_var = tk.StringVar(value="10000")
         self.max_pages_var = tk.StringVar()
@@ -222,8 +223,11 @@ class LogVaultApp:
         ttk.Checkbutton(export, text="Create zip archive", variable=self.zip_var).grid(
             row=3, column=1, sticky="w", padx=6, pady=6
         )
-        ttk.Checkbutton(export, text="Allow unlisted reports", variable=self.allow_unlisted_var).grid(
+        ttk.Checkbutton(export, text="Keep only archive", variable=self.archive_only_var).grid(
             row=3, column=2, sticky="w", padx=6, pady=6
+        )
+        ttk.Checkbutton(export, text="Allow unlisted reports", variable=self.allow_unlisted_var).grid(
+            row=3, column=3, sticky="w", padx=6, pady=6
         )
         self._label(export, "Events/page", 4, 0)
         ttk.Entry(export, textvariable=self.limit_var, width=14).grid(row=4, column=1, sticky="w", padx=6, pady=6)
@@ -364,6 +368,7 @@ class LogVaultApp:
                 filter_expression=self.filter_var.get().strip() or None,
                 out=Path(self.out_var.get().strip() or "exports"),
                 make_zip=self.zip_var.get(),
+                archive_only=self.archive_only_var.get(),
                 limit=limit,
                 max_pages=max_pages,
                 allow_unlisted=self.allow_unlisted_var.get(),
@@ -380,6 +385,7 @@ class LogVaultApp:
             filter_expression=self.filter_var.get().strip() or None,
             out=Path(self.out_var.get().strip() or "exports"),
             make_zip=self.zip_var.get(),
+            archive_only=self.archive_only_var.get(),
             limit=limit,
             max_pages=max_pages,
             allow_unlisted=self.allow_unlisted_var.get(),
@@ -426,7 +432,7 @@ class LogVaultApp:
                 self.last_result = payload
                 self.open_button.configure(state="normal")
                 self._append_log("Finished.")
-                messagebox.showinfo("Download complete", f"Saved to:\n{payload.out_dir}")
+                messagebox.showinfo("Download complete", f"Saved to:\n{self._primary_output(payload)}")
         self.root.after(100, self._poll_messages)
 
     def _finish_running(self) -> None:
@@ -447,7 +453,14 @@ class LogVaultApp:
     def _open_output(self) -> None:
         if not self.last_result:
             return
-        webbrowser.open(self.last_result.out_dir.resolve().as_uri())
+        webbrowser.open(self._primary_output(self.last_result).resolve().as_uri())
+
+    def _primary_output(self, result: DownloadResult | CharacterReportsResult) -> Path:
+        if result.out_dir.exists():
+            return result.out_dir
+        if result.archive is not None:
+            return result.archive
+        return result.out_dir
 
 
 def parse_positive_int(value: str, label: str) -> int:

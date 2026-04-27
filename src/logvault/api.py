@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import gzip
 import json
 import os
 import ssl
@@ -8,6 +9,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import zlib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -454,15 +456,26 @@ class WarcraftLogsClient:
         data: bytes,
         headers: dict[str, str],
     ) -> dict[str, Any]:
-        request = urllib.request.Request(url, data=data, headers=headers, method="POST")
+        request_headers = dict(headers)
+        request_headers.setdefault("Accept-Encoding", "gzip, deflate")
+        request = urllib.request.Request(url, data=data, headers=request_headers, method="POST")
         try:
             with urllib.request.urlopen(request, timeout=self.timeout, context=self.ssl_context) as response:
                 raw = response.read()
+                content_encoding = response.headers.get("Content-Encoding", "").lower()
         except urllib.error.HTTPError as exc:
             raw = exc.read().decode("utf-8", errors="replace")
             raise WarcraftLogsError(f"HTTP {exc.code} from {url}: {raw}") from exc
         except urllib.error.URLError as exc:
             raise WarcraftLogsError(f"Request failed for {url}: {exc.reason}") from exc
+
+        if content_encoding == "gzip":
+            raw = gzip.decompress(raw)
+        elif content_encoding == "deflate":
+            try:
+                raw = zlib.decompress(raw)
+            except zlib.error:
+                raw = zlib.decompress(raw, -zlib.MAX_WBITS)
 
         try:
             decoded = json.loads(raw.decode("utf-8"))

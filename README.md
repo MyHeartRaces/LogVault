@@ -13,8 +13,8 @@ Each report bundle contains:
 - `summary.md` - a human-readable overview of the selected fights.
 - `fights.csv`, `actors.csv`, `abilities.csv` - report reference data.
 - `tables/*.csv` and `tables/*.json` - aggregate Warcraft Logs tables such as damage, healing, casts, deaths, interrupts, buffs, debuffs, and resources.
-- `events/*.jsonl` and `events/*.csv` - optional raw events. Disabled by default to keep bundles small.
-- A `.zip` archive next to the export folder for easy sharing.
+- `events/*.jsonl.gz` and `events/*.csv` - optional raw events. Disabled by default to keep bundles small. Raw JSONL is gzip-compressed when event export is enabled.
+- A `.zip` archive for easy sharing. The GUI defaults to keeping only the archive, so exports do not leave a large extracted folder on disk.
 
 Character batch exports also include:
 
@@ -24,11 +24,11 @@ Character batch exports also include:
 
 ## Download Releases
 
-Prebuilt single-file binaries are published on GitHub Releases:
+Prebuilt binaries and installers are published on GitHub Releases:
 
-- [Windows x64 executable](https://github.com/MyHeartRaces/LogVault/releases/latest)
-- [Linux x64 binary](https://github.com/MyHeartRaces/LogVault/releases/latest)
-- [macOS arm64 binary](https://github.com/MyHeartRaces/LogVault/releases/latest)
+- Windows: `LogVault-Setup-*-x64.exe` installer, plus the portable `LogVault-windows-x64.exe`.
+- Linux: `LogVault-linux-x64` portable binary, desktop install script, and `logvault-bin-*-x86_64.pkg.tar.zst` for Arch.
+- macOS: `LogVault-macos-arm64.dmg`, `.app.zip`, and the raw `LogVault-macos-arm64` binary.
 
 Windows SmartScreen may warn about the `.exe` because the binary is not code-signed.
 
@@ -101,7 +101,9 @@ logvault-gui
 
 Single report mode downloads one Warcraft Logs report URL or report code. Character reports mode downloads recent reports for a character, filters them by season dates, then exports fights matching the selected difficulty.
 
-The default event mode is `compact`, which exports tables and summaries but no raw event streams. Use `essential` for deaths/interrupts/dispels/combatant info, or `full` only when you really need raw per-event data. Full event exports can be hundreds of megabytes per report.
+The default event mode is `compact`, which exports tables and summaries but no raw event streams. Use `essential` for deaths/interrupts/dispels/combatant info, or `full` only when you really need raw per-event data. Full event exports can still be large, but raw JSONL is stored as `.jsonl.gz` and the shareable `.zip` is the primary output.
+
+The GUI enables `Keep only archive` by default. Turn it off only if you want an extracted folder next to the `.zip`.
 
 Character fields:
 
@@ -155,6 +157,12 @@ Export all raw event streams:
 logvault REPORTCODE --events full
 ```
 
+Create only the compressed bundle and remove the extracted folder:
+
+```bash
+logvault REPORTCODE --archive-only
+```
+
 Download all available Mythic reports for a character in a season:
 
 ```bash
@@ -173,9 +181,31 @@ Download every difficulty for the same season:
 logvault --character CharacterName --server realm-slug --region eu --difficulty all --season-start 2026-01-01 --season-end 2026-06-30
 ```
 
+## Installers And Desktop Launchers
+
+Windows:
+
+1. Download `LogVault-Setup-*-x64.exe` from the latest release.
+2. Run the installer.
+3. Start LogVault from the Start menu.
+
+macOS:
+
+1. Download `LogVault-macos-arm64.dmg` from the latest release.
+2. Open the DMG and drag `LogVault.app` into Applications.
+3. If Gatekeeper blocks the unsigned app, right-click it and choose Open.
+
 ## Arch Linux Desktop Entry
 
-No AppImage is required. Download `LogVault-linux-x64`, `install_linux_desktop.sh`, and `logvault.svg` from the release, then run:
+No AppImage is required. The release includes an Arch package:
+
+```bash
+sudo pacman -U logvault-bin-*-x86_64.pkg.tar.zst
+```
+
+It installs the binary and a desktop launcher, so LogVault appears in the application menu.
+
+Portable install is also available. Download `LogVault-linux-x64`, `install_linux_desktop.sh`, and `logvault.svg` from the release, then run:
 
 ```bash
 chmod +x LogVault-linux-x64 install_linux_desktop.sh
@@ -192,7 +222,7 @@ This installs:
 
 LogVault should appear in GNOME, KDE, Xfce, and other desktop menus. If the menu does not update immediately, log out and back in.
 
-Native Arch package:
+Source-based Arch package:
 
 ```bash
 cd packaging/arch
@@ -216,11 +246,11 @@ chmod +x scripts/build_unix.sh
 ./scripts/build_unix.sh
 ```
 
-GitHub Actions also builds Windows, Linux, and macOS artifacts on tags:
+GitHub Actions also builds Windows, Linux, macOS, installer, app, and Arch package artifacts on tags:
 
 ```bash
-git tag v0.3.0
-git push origin v0.3.0
+git tag v0.5.0
+git push origin v0.5.0
 ```
 
 ## Tests

@@ -27,6 +27,7 @@ class DownloadOptions:
     filter_expression: str | None = None
     out: Path = Path("exports")
     make_zip: bool = True
+    archive_only: bool = False
     limit: int = 10_000
     max_pages: int | None = None
     allow_unlisted: bool = True
@@ -48,6 +49,8 @@ class DownloadResult:
 
 def download_report(options: DownloadOptions, progress: ProgressCallback | None = None) -> DownloadResult:
     progress = progress or (lambda _message: None)
+    if options.archive_only and not options.make_zip:
+        raise ValueError("Archive-only output requires zip archive creation.")
     if options.env_file is not None:
         load_env_file(options.env_file)
 
@@ -122,6 +125,7 @@ def download_report(options: DownloadOptions, progress: ProgressCallback | None 
         events_by_type=event_iterables,
         source_url=options.report,
         make_zip=options.make_zip,
+        archive_only=options.archive_only,
     )
 
     return DownloadResult(

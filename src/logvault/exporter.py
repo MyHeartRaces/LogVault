@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import gzip
 import json
 import re
 import shutil
@@ -20,6 +21,7 @@ def export_bundle(
     events_by_type: dict[str, Iterable[dict[str, Any]]],
     source_url: str,
     make_zip: bool = True,
+    archive_only: bool = False,
 ) -> tuple[Path, Path | None]:
     out_dir.mkdir(parents=True, exist_ok=True)
     tables_dir = out_dir / "tables"
@@ -41,7 +43,7 @@ def export_bundle(
 
     event_counts: dict[str, int] = {}
     for event_type, events in events_by_type.items():
-        jsonl_path = events_dir / f"{safe_name(event_type)}.jsonl"
+        jsonl_path = events_dir / f"{safe_name(event_type)}.jsonl.gz"
         csv_path = events_dir / f"{safe_name(event_type)}.csv"
         count = write_events(jsonl_path, csv_path, events)
         event_counts[event_type] = count
@@ -58,6 +60,8 @@ def export_bundle(
     archive_path: Path | None = None
     if make_zip:
         archive_path = zip_bundle(out_dir)
+        if archive_only:
+            shutil.rmtree(out_dir)
     return out_dir, archive_path
 
 
@@ -81,7 +85,7 @@ def build_metadata(*, report: dict[str, Any], fight_ids: list[int], source_url: 
             "actors": "actors.csv",
             "abilities": "abilities.csv",
             "tables": "tables/*.json and tables/*.csv",
-            "events": "events/*.jsonl and events/*.csv when event export is enabled",
+            "events": "events/*.jsonl.gz and events/*.csv when event export is enabled",
         },
     }
 
@@ -142,8 +146,8 @@ def render_summary(
         "",
         "- `summary.md` is the quick human-readable overview.",
         "- `tables/*.csv` contains aggregate Warcraft Logs tables such as damage, healing, deaths, casts, interrupts.",
-        "- `events/*.jsonl` contains one raw event per line when event export is enabled.",
-        "- `events/*.csv` contains common event columns when event export is enabled.",
+        "- `events/*.jsonl.gz` contains compressed raw events when event export is enabled.",
+        "- `events/*.csv` contains common event columns in a spreadsheet-friendly format when event export is enabled.",
     ])
     return "\n".join(lines) + "\n"
 
@@ -219,7 +223,11 @@ def table_rows(value: Any) -> list[dict[str, Any]]:
 def write_events(jsonl_path: Path, csv_path: Path, events: Iterable[dict[str, Any]]) -> int:
     count = 0
     fieldnames = ["timestamp", "type", "sourceID", "targetID", "abilityGameID", "ability", "amount", "hitType"]
-    with jsonl_path.open("w", encoding="utf-8") as jsonl, csv_path.open("w", encoding="utf-8", newline="") as csv_file:
+    with gzip.open(jsonl_path, "wt", encoding="utf-8", compresslevel=9) as jsonl, csv_path.open(
+        "w",
+        encoding="utf-8",
+        newline="",
+    ) as csv_file:
         writer = csv.DictWriter(csv_file, fieldnames=fieldnames, extrasaction="ignore")
         writer.writeheader()
         for event in events:
@@ -264,7 +272,7 @@ def zip_bundle(out_dir: Path) -> Path:
     archive = out_dir.with_suffix(".zip")
     if archive.exists():
         archive.unlink()
-    with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as zip_file:
+    with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zip_file:
         for path in sorted(out_dir.rglob("*")):
             if path.is_file():
                 zip_file.write(path, path.relative_to(out_dir.parent))

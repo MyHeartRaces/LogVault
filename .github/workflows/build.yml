@@ -19,13 +19,13 @@ jobs:
         include:
           - os: windows-latest
             artifact_name: LogVault-windows-x64
-            artifact_path: release/LogVault-windows-x64.exe
+            artifact_path: release/*
           - os: ubuntu-latest
             artifact_name: LogVault-linux-x64
             artifact_path: release/*
           - os: macos-latest
             artifact_name: LogVault-macos
-            artifact_path: release/LogVault-macos-arm64
+            artifact_path: release/*
 
     steps:
       - name: Check out repository
@@ -40,7 +40,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3-tk
+          sudo apt-get install -y python3-tk zstd
 
       - name: Install build tools
         run: |
@@ -55,20 +55,33 @@ jobs:
       - name: Build one-file executable
         run: python -m PyInstaller --clean --noconfirm LogVault.spec
 
+      - name: Build Windows installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          $version = python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])"
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DAppVersion=$version" "packaging\windows\LogVault.iss"
+
       - name: Prepare artifact
         shell: bash
         run: |
           mkdir -p release
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             cp dist/LogVault.exe release/LogVault-windows-x64.exe
+            cp installer/LogVault-Setup-*-x64.exe release/
           elif [[ "$RUNNER_OS" == "Linux" ]]; then
             cp dist/LogVault release/LogVault-linux-x64
             chmod +x release/LogVault-linux-x64
             cp scripts/install_linux_desktop.sh release/install_linux_desktop.sh
             cp assets/logvault.svg release/logvault.svg
+            chmod +x scripts/package_arch_binary.sh
+            ./scripts/package_arch_binary.sh
           else
             cp dist/LogVault release/LogVault-macos-arm64
             chmod +x release/LogVault-macos-arm64
+            chmod +x scripts/package_macos_app.sh
+            ./scripts/package_macos_app.sh
           fi
 
       - name: Upload executable

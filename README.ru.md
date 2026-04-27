@@ -13,8 +13,8 @@ LogVault скачивает отчеты World of Warcraft через Warcraft L
 - `summary.md` - короткий обзор выбранных боев.
 - `fights.csv`, `actors.csv`, `abilities.csv` - справочники отчета.
 - `tables/*.csv` и `tables/*.json` - агрегированные таблицы Warcraft Logs: урон, лечение, касты, смерти, прерывания, баффы, дебаффы, ресурсы.
-- `events/*.jsonl` и `events/*.csv` - опциональные сырые события. По умолчанию отключены, чтобы пакет не раздувался.
-- `.zip` рядом с папкой экспорта.
+- `events/*.jsonl.gz` и `events/*.csv` - опциональные сырые события. По умолчанию отключены, чтобы пакет не раздувался. Raw JSONL сжимается gzip, если экспорт событий включен.
+- `.zip` для отправки и хранения. GUI по умолчанию оставляет только архив, чтобы рядом не лежала огромная распакованная папка.
 
 При массовой выгрузке персонажа дополнительно создаются:
 
@@ -24,11 +24,11 @@ LogVault скачивает отчеты World of Warcraft через Warcraft L
 
 ## Готовые сборки
 
-Single-file бинарники публикуются в GitHub Releases:
+Бинарники, установщики и пакеты публикуются в GitHub Releases:
 
-- [Windows x64 executable](https://github.com/MyHeartRaces/LogVault/releases/latest)
-- [Linux x64 binary](https://github.com/MyHeartRaces/LogVault/releases/latest)
-- [macOS arm64 binary](https://github.com/MyHeartRaces/LogVault/releases/latest)
+- Windows: установщик `LogVault-Setup-*-x64.exe` и portable `LogVault-windows-x64.exe`.
+- Linux: portable `LogVault-linux-x64`, скрипт установки desktop entry и Arch-пакет `logvault-bin-*-x86_64.pkg.tar.zst`.
+- macOS: `LogVault-macos-arm64.dmg`, `.app.zip` и raw binary `LogVault-macos-arm64`.
 
 Windows SmartScreen может ругаться на `.exe`, потому что бинарник не подписан платным code-signing сертификатом.
 
@@ -103,7 +103,9 @@ logvault-gui
 
 `Character reports` скачивает recent reports персонажа, фильтрует их по датам сезона, а внутри каждого отчета выгружает только бои выбранной сложности.
 
-Режим событий по умолчанию - `compact`: сохраняются таблицы и summary, но не сырые event streams. `essential` выгружает небольшой набор событий: deaths, interrupts, dispels, combatant info. `full` включает все сырые события и может дать сотни мегабайт на один отчет.
+Режим событий по умолчанию - `compact`: сохраняются таблицы и summary, но не сырые event streams. `essential` выгружает небольшой набор событий: deaths, interrupts, dispels, combatant info. `full` включает все сырые события и все еще может быть большим, но raw JSONL хранится как `.jsonl.gz`, а главным файлом для отправки становится `.zip`.
+
+В GUI включена опция `Keep only archive`: после экспорта остается только сжатый архив. Отключай ее только если нужна распакованная папка рядом с архивом.
 
 Поля режима персонажа:
 
@@ -157,6 +159,12 @@ logvault REPORTCODE --events essential
 logvault REPORTCODE --events full
 ```
 
+Оставить только сжатый bundle и удалить распакованную папку:
+
+```bash
+logvault REPORTCODE --archive-only
+```
+
 Скачать все доступные Mythic-отчеты персонажа за сезон:
 
 ```bash
@@ -175,9 +183,31 @@ logvault \
 logvault --character CharacterName --server realm-slug --region eu --difficulty all --season-start 2026-01-01 --season-end 2026-06-30
 ```
 
+## Установщики и запуск из меню
+
+Windows:
+
+1. Скачай `LogVault-Setup-*-x64.exe` из последнего релиза.
+2. Запусти установщик.
+3. Открывай LogVault из Start menu.
+
+macOS:
+
+1. Скачай `LogVault-macos-arm64.dmg` из последнего релиза.
+2. Открой DMG и перетащи `LogVault.app` в Applications.
+3. Если Gatekeeper блокирует неподписанное приложение, нажми правой кнопкой по приложению и выбери Open.
+
 ## Arch Linux
 
-AppImage не нужен. Скачай `LogVault-linux-x64`, `install_linux_desktop.sh` и `logvault.svg` из релиза:
+AppImage не нужен. В релизе есть Arch-пакет:
+
+```bash
+sudo pacman -U logvault-bin-*-x86_64.pkg.tar.zst
+```
+
+Он ставит бинарник и desktop launcher, после чего LogVault появляется в меню приложений.
+
+Portable-вариант тоже есть. Скачай `LogVault-linux-x64`, `install_linux_desktop.sh` и `logvault.svg` из релиза:
 
 ```bash
 chmod +x LogVault-linux-x64 install_linux_desktop.sh
@@ -194,7 +224,7 @@ chmod +x LogVault-linux-x64 install_linux_desktop.sh
 
 После этого LogVault появится в меню GNOME/KDE/Xfce. Если меню не обновилось сразу, сделай logout/login.
 
-Нативный Arch-пакет:
+Source-based Arch-пакет:
 
 ```bash
 cd packaging/arch
@@ -218,11 +248,11 @@ chmod +x scripts/build_unix.sh
 ./scripts/build_unix.sh
 ```
 
-GitHub Actions собирает Windows, Linux и macOS артефакты на tag:
+GitHub Actions собирает Windows, Linux, macOS, установщик, app bundle и Arch package на tag:
 
 ```bash
-git tag v0.3.0
-git push origin v0.3.0
+git tag v0.5.0
+git push origin v0.5.0
 ```
 
 ## Тесты
