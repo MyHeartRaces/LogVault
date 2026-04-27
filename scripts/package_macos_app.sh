@@ -57,7 +57,7 @@ EOF
 
 echo "APPL????" > "$APP_DIR/Contents/PkgInfo"
 
-codesign --force --deep --options runtime --sign - "$APP_DIR"
+codesign --force --deep --sign - "$APP_DIR"
 codesign --verify --deep --strict --verbose=2 "$APP_DIR"
 
 mkdir -p "$DMG_ROOT"
