@@ -9,11 +9,11 @@ from typing import Any
 
 from .api import WarcraftLogsClient
 from .cli_defaults import DEFAULT_EVENT_TYPES, DEFAULT_TABLE_TYPES, ESSENTIAL_EVENT_TYPES, FULL_EVENT_TYPES
-from .difficulty import difficulty_label
+from .difficulty import difficulty_scope_label
 from .env import load_env_file
 from .errors import DownloadCancelled
 from .exporter import export_bundle, fresh_output_dir
-from .selection import parse_list, parse_report_input, resolve_fight_ids, selected_time_window
+from .selection import filter_fights_by_encounter, parse_list, parse_report_input, resolve_fight_ids, selected_time_window
 
 
 ProgressCallback = Callable[[str], None]
@@ -39,6 +39,8 @@ class DownloadOptions:
     timeout: float = 60.0
     env_file: Path | None = Path(".env")
     difficulty_id: int | None = None
+    difficulty_ids: tuple[int, ...] | None = None
+    encounter: str | None = None
     cancel_check: Callable[[], bool] | None = None
 
 
@@ -73,13 +75,14 @@ def download_report(options: DownloadOptions, progress: ProgressCallback | None 
     report = client.fetch_report_metadata(report_input.code, allow_unlisted=options.allow_unlisted)
     raise_if_cancelled(options.cancel_check)
     fights = list(report.get("fights") or [])
-    if options.difficulty_id is not None:
-        fights = [
-            fight
-            for fight in fights
-            if int(fight.get("difficulty") or -1) == options.difficulty_id
-        ]
-        progress(f"Applied difficulty filter: {difficulty_label(options.difficulty_id)}")
+    difficulty_ids = option_difficulty_ids(options.difficulty_id, options.difficulty_ids)
+    if difficulty_ids is not None:
+        difficulty_set = set(difficulty_ids)
+        fights = [fight for fight in fights if int(fight.get("difficulty") or -1) in difficulty_set]
+        progress(f"Applied difficulty filter: {difficulty_scope_label(difficulty_ids)}")
+    if options.encounter:
+        fights = filter_fights_by_encounter(fights, options.encounter)
+        progress(f"Applied encounter filter: {options.encounter}")
     fight_ids = resolve_fight_ids(
         fights,
         explicit=options.fight,
@@ -192,6 +195,17 @@ def getenv_any(*names: str) -> str | None:
         value = os.getenv(name)
         if value:
             return value
+    return None
+
+
+def option_difficulty_ids(
+    difficulty_id: int | None,
+    difficulty_ids: tuple[int, ...] | None,
+) -> tuple[int, ...] | None:
+    if difficulty_ids is not None:
+        return difficulty_ids or None
+    if difficulty_id is not None:
+        return (difficulty_id,)
     return None
 
 

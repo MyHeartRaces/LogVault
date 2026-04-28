@@ -16,6 +16,7 @@ DIFFICULTY_LABELS = {
 }
 
 DIFFICULTY_CHOICES = ["All", "Mythic", "Heroic", "Normal", "LFR"]
+DIFFICULTY_SCOPE_CHOICES = ["All", "Mythic", "Heroic", "Mythic + Heroic", "Normal", "LFR"]
 
 
 def parse_difficulty(value: str | None) -> int | None:
@@ -34,8 +35,36 @@ def parse_difficulty(value: str | None) -> int | None:
     return DIFFICULTY_IDS[normalized]
 
 
+def parse_difficulty_scope(value: str | None) -> tuple[int, ...] | None:
+    if value is None:
+        return None
+    normalized = value.strip().lower()
+    if normalized in {"", "all", "any", "все"}:
+        return None
+
+    for separator in ("+", "/", ";"):
+        normalized = normalized.replace(separator, ",")
+    normalized = normalized.replace(" and ", ",")
+
+    parts = [part.strip() for part in normalized.split(",") if part.strip()]
+    if any(part in {"all", "any", "все"} for part in parts):
+        raise ValueError("Use 'All' by itself, or list specific difficulties.")
+
+    values: list[int] = []
+    for part in parts:
+        parsed = parse_difficulty(part)
+        if parsed not in values:
+            values.append(parsed)
+    return tuple(values) or None
+
+
 def difficulty_label(value: int | None) -> str:
     if value is None:
         return "All"
     return DIFFICULTY_LABELS.get(value, str(value))
 
+
+def difficulty_scope_label(values: tuple[int, ...] | list[int] | None) -> str:
+    if not values:
+        return "All"
+    return " + ".join(difficulty_label(value) for value in values)

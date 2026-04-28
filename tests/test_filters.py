@@ -1,7 +1,7 @@
 import unittest
 
 from logvault.dates import parse_date_bound, report_timestamp_seconds
-from logvault.difficulty import difficulty_label, parse_difficulty
+from logvault.difficulty import difficulty_label, difficulty_scope_label, parse_difficulty, parse_difficulty_scope
 from logvault.download import resolve_event_type_list
 
 
@@ -12,6 +12,12 @@ class FilterTests(unittest.TestCase):
         self.assertEqual(parse_difficulty("heroic"), 4)
         self.assertEqual(parse_difficulty("3"), 3)
         self.assertEqual(difficulty_label(1), "LFR")
+
+    def test_parse_difficulty_scope(self):
+        self.assertIsNone(parse_difficulty_scope("all"))
+        self.assertEqual(parse_difficulty_scope("Mythic + Heroic"), (5, 4))
+        self.assertEqual(parse_difficulty_scope("mythic,heroic"), (5, 4))
+        self.assertEqual(difficulty_scope_label((5, 4)), "Mythic + Heroic")
 
     def test_parse_date_bound(self):
         start = parse_date_bound("2026-01-02")

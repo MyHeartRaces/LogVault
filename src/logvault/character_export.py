@@ -11,8 +11,15 @@ from typing import Any
 
 from .api import WarcraftLogsClient
 from .dates import parse_date_bound, report_timestamp_seconds
-from .difficulty import difficulty_label
-from .download import DownloadOptions, DownloadResult, download_report, getenv_any, raise_if_cancelled
+from .difficulty import difficulty_scope_label
+from .download import (
+    DownloadOptions,
+    DownloadResult,
+    download_report,
+    getenv_any,
+    option_difficulty_ids,
+    raise_if_cancelled,
+)
 from .env import load_env_file
 from .errors import WarcraftLogsError
 from .exporter import safe_name, zip_bundle
@@ -24,6 +31,8 @@ class CharacterReportsOptions:
     server_slug: str
     server_region: str
     difficulty_id: int | None = None
+    difficulty_ids: tuple[int, ...] | None = None
+    encounter: str | None = None
     season_start: str | None = None
     season_end: str | None = None
     max_reports: int | None = None
@@ -96,7 +105,8 @@ def download_character_reports(
             safe_name(options.character_name),
             safe_name(options.server_region),
             safe_name(options.server_slug),
-            safe_name(difficulty_label(options.difficulty_id)),
+            safe_name(difficulty_scope_label(option_difficulty_ids(options.difficulty_id, options.difficulty_ids))),
+            safe_name(options.encounter or ""),
             stamp,
         ]
         if part
@@ -135,6 +145,8 @@ def download_character_reports(
                     timeout=options.timeout,
                     env_file=options.env_file,
                     difficulty_id=options.difficulty_id,
+                    difficulty_ids=options.difficulty_ids,
+                    encounter=options.encounter,
                     cancel_check=options.cancel_check,
                 ),
                 progress=progress,
@@ -231,7 +243,8 @@ def write_character_index(
             "name": options.character_name,
             "serverSlug": options.server_slug,
             "serverRegion": options.server_region,
-            "difficulty": difficulty_label(options.difficulty_id),
+            "difficulty": difficulty_scope_label(option_difficulty_ids(options.difficulty_id, options.difficulty_ids)),
+            "encounter": options.encounter,
             "seasonStart": options.season_start,
             "seasonEnd": options.season_end,
             "maxReports": options.max_reports,
@@ -281,7 +294,8 @@ def write_character_index(
         f"# {options.character_name} - Warcraft Logs export",
         "",
         f"- Server: `{options.server_region}/{options.server_slug}`",
-        f"- Difficulty: {difficulty_label(options.difficulty_id)}",
+        f"- Difficulty: {difficulty_scope_label(option_difficulty_ids(options.difficulty_id, options.difficulty_ids))}",
+        f"- Encounter: {options.encounter or 'all'}",
         f"- Season start: {options.season_start or 'not set'}",
         f"- Season end: {options.season_end or 'not set'}",
         f"- Reports matched: {len(source_reports)}",

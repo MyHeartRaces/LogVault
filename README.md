@@ -101,11 +101,11 @@ Launch:
 logvault-gui
 ```
 
-Single report mode downloads one Warcraft Logs report URL or report code. Character reports mode downloads recent reports for a character, filters them by season dates, then exports fights matching the selected difficulty.
+Single report mode downloads one Warcraft Logs report URL or report code. Character reports mode downloads recent reports for a character, filters them by season dates, then exports fights matching the selected difficulty scope and optional encounter.
 
 The default event mode is `compact`, which exports tables and summaries but no raw event streams. Use `essential` for deaths/interrupts/dispels/combatant info, or `full` only when you really need raw per-event data. Full event exports can still be large, but raw JSONL is stored as `.jsonl.gz` and the shareable `.zip` is the primary output.
 
-The GUI enables `Keep only archive` by default. Turn it off only if you want an extracted folder next to the `.zip`. During a running export, use `Отменить` to cancel; LogVault stops after the current API request or retry sleep notices the cancellation.
+The GUI enables `Keep only archive` by default. Turn it off only if you want an extracted folder next to the `.zip`. During a running export, use `Cancel` to stop; LogVault stops after the current API request or retry sleep notices the cancellation.
 
 Warcraft Logs requests are retried automatically on transient network failures such as dropped connections, incomplete reads, HTTP 429, and HTTP 5xx responses. Character batch exports continue with the next report if one report still fails after all retries.
 
@@ -114,7 +114,8 @@ Character fields:
 - `Character` - character name.
 - `Realm slug` - Warcraft Logs realm slug, for example `draenor` or `howling-fjord`.
 - `Region` - `eu`, `us`, `kr`, `tw`, or `cn`.
-- `Difficulty` - `All`, `Mythic`, `Heroic`, `Normal`, or `LFR`.
+- `Difficulty` - `All`, `Mythic`, `Heroic`, `Mythic + Heroic`, `Normal`, or `LFR`. You can also type a comma/plus-separated scope.
+- `Encounter` - optional encounter ID or boss name, for example `Fyrakk` or `2824`.
 - `Season start` / `Season end` - `YYYY-MM-DD`.
 
 ## CLI Examples
@@ -135,6 +136,12 @@ Download all boss pulls:
 
 ```bash
 logvault REPORTCODE --fight boss
+```
+
+Download only one encounter from a report:
+
+```bash
+logvault REPORTCODE --fight boss --encounter "Boss Name"
 ```
 
 Download all fights, including trash:
@@ -175,6 +182,19 @@ logvault \
   --server realm-slug \
   --region eu \
   --difficulty mythic \
+  --season-start 2026-01-01 \
+  --season-end 2026-06-30
+```
+
+Download only Mythic and Heroic pulls for one encounter:
+
+```bash
+logvault \
+  --character CharacterName \
+  --server realm-slug \
+  --region eu \
+  --difficulty "mythic+heroic" \
+  --encounter "Boss Name" \
   --season-start 2026-01-01 \
   --season-end 2026-06-30
 ```
@@ -259,8 +279,8 @@ chmod +x scripts/build_unix.sh
 GitHub Actions also builds Windows, Linux, macOS, installer, app, and Arch package artifacts on tags:
 
 ```bash
-git tag v0.5.6
-git push origin v0.5.6
+git tag v0.6.0
+git push origin v0.6.0
 ```
 
 ## Tests

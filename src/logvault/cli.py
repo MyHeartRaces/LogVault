@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 from .character_export import CharacterReportsOptions, download_character_reports
-from .difficulty import DIFFICULTY_CHOICES, parse_difficulty
+from .difficulty import DIFFICULTY_SCOPE_CHOICES, parse_difficulty_scope
 from .download import DownloadOptions, download_report
 from .errors import LogVaultError
 
@@ -36,8 +36,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--difficulty",
         default="all",
-        help=f"Difficulty filter: {', '.join(DIFFICULTY_CHOICES)}. Default: all.",
+        help=(
+            f"Difficulty scope: {', '.join(DIFFICULTY_SCOPE_CHOICES)}, or a comma/plus-separated list. "
+            "Example: mythic+heroic. Default: all."
+        ),
     )
+    parser.add_argument("--encounter", help="Only export one encounter. Accepts encounter ID or boss name.")
     parser.add_argument("--season-start", help="Character batch start date, YYYY-MM-DD.")
     parser.add_argument("--season-end", help="Character batch end date, YYYY-MM-DD.")
     parser.add_argument(
@@ -98,7 +102,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def run_download(args: argparse.Namespace) -> int:
-    difficulty_id = parse_difficulty(args.difficulty)
+    difficulty_ids = parse_difficulty_scope(args.difficulty)
     if args.character:
         if not args.server:
             raise ValueError("--server is required with --character.")
@@ -107,7 +111,8 @@ def run_download(args: argparse.Namespace) -> int:
                 character_name=args.character,
                 server_slug=args.server,
                 server_region=args.region,
-                difficulty_id=difficulty_id,
+                difficulty_ids=difficulty_ids,
+                encounter=args.encounter,
                 season_start=args.season_start,
                 season_end=args.season_end,
                 max_reports=args.max_reports or None,
@@ -156,7 +161,8 @@ def run_download(args: argparse.Namespace) -> int:
             client_secret=args.client_secret,
             access_token=args.access_token,
             timeout=args.timeout,
-            difficulty_id=difficulty_id,
+            difficulty_ids=difficulty_ids,
+            encounter=args.encounter,
         ),
         progress=lambda message: print(message, file=sys.stderr),
     )

@@ -19,7 +19,7 @@ except ImportError:  # pragma: no cover - depends on OS Python packages.
     scrolledtext = None
 
 from .character_export import CharacterReportsOptions, CharacterReportsResult, download_character_reports
-from .difficulty import DIFFICULTY_CHOICES, parse_difficulty
+from .difficulty import DIFFICULTY_SCOPE_CHOICES, parse_difficulty_scope
 from .download import DownloadOptions, DownloadResult, download_report
 from .env import load_env_file
 from .errors import DownloadCancelled, LogVaultError
@@ -51,6 +51,7 @@ class LogVaultApp:
         self.server_var = tk.StringVar()
         self.region_var = tk.StringVar(value="eu")
         self.difficulty_var = tk.StringVar(value="All")
+        self.encounter_var = tk.StringVar()
         self.season_start_var = tk.StringVar()
         self.season_end_var = tk.StringVar()
         self.max_reports_var = tk.StringVar(value="0")
@@ -339,17 +340,19 @@ class LogVaultApp:
             row=4, column=1, sticky="w", padx=6, pady=6
         )
         self._label(source, "Difficulty", 4, 2)
-        ttk.Combobox(source, textvariable=self.difficulty_var, values=DIFFICULTY_CHOICES, width=14, state="readonly").grid(
+        ttk.Combobox(source, textvariable=self.difficulty_var, values=DIFFICULTY_SCOPE_CHOICES, width=18).grid(
             row=4, column=3, sticky="w", padx=6, pady=6
         )
-        self._label(source, "Season start", 5, 0)
-        ttk.Entry(source, textvariable=self.season_start_var, width=16).grid(row=5, column=1, sticky="w", padx=6, pady=6)
-        self._label(source, "Season end", 5, 2)
-        ttk.Entry(source, textvariable=self.season_end_var, width=16).grid(row=5, column=3, sticky="w", padx=6, pady=6)
-        self._label(source, "Max reports", 6, 0)
-        ttk.Entry(source, textvariable=self.max_reports_var, width=12).grid(row=6, column=1, sticky="w", padx=6, pady=6)
+        self._label(source, "Encounter", 5, 0)
+        ttk.Entry(source, textvariable=self.encounter_var).grid(row=5, column=1, columnspan=3, sticky="ew", padx=6, pady=6)
+        self._label(source, "Season start", 6, 0)
+        ttk.Entry(source, textvariable=self.season_start_var, width=16).grid(row=6, column=1, sticky="w", padx=6, pady=6)
+        self._label(source, "Season end", 6, 2)
+        ttk.Entry(source, textvariable=self.season_end_var, width=16).grid(row=6, column=3, sticky="w", padx=6, pady=6)
+        self._label(source, "Max reports", 7, 0)
+        ttk.Entry(source, textvariable=self.max_reports_var, width=12).grid(row=7, column=1, sticky="w", padx=6, pady=6)
         ttk.Label(source, text="Dates: YYYY-MM-DD. Max reports 0 means no local cap.").grid(
-            row=6, column=2, columnspan=2, sticky="w", padx=6, pady=6
+            row=7, column=2, columnspan=2, sticky="w", padx=6, pady=6
         )
 
         credentials = ttk.LabelFrame(root_frame, text="Warcraft Logs OAuth client")
@@ -402,7 +405,7 @@ class LogVaultApp:
         actions.columnconfigure(3, weight=1)
         self.download_button = ttk.Button(actions, text="Download", style="Accent.TButton", command=self._start_download)
         self.download_button.grid(row=0, column=0, sticky="w")
-        self.cancel_button = ttk.Button(actions, text="Отменить", command=self._cancel_download, state="disabled")
+        self.cancel_button = ttk.Button(actions, text="Cancel", command=self._cancel_download, state="disabled")
         self.cancel_button.grid(row=0, column=1, sticky="w", padx=(8, 0))
         self.open_button = ttk.Button(actions, text="Open output folder", command=self._open_output, state="disabled")
         self.open_button.grid(row=0, column=2, sticky="w", padx=(8, 0))
@@ -540,7 +543,8 @@ class LogVaultApp:
 
     def _collect_options(self) -> DownloadOptions | CharacterReportsOptions:
         report = self.report_var.get().strip()
-        difficulty_id = parse_difficulty(self.difficulty_var.get())
+        difficulty_ids = parse_difficulty_scope(self.difficulty_var.get())
+        encounter = self.encounter_var.get().strip() or None
         if self.mode_var.get() == "report" and not report:
             raise ValueError("Report URL or code is required.")
 
@@ -565,7 +569,8 @@ class LogVaultApp:
                 character_name=character,
                 server_slug=server,
                 server_region=self.region_var.get().strip() or "eu",
-                difficulty_id=difficulty_id,
+                difficulty_ids=difficulty_ids,
+                encounter=encounter,
                 season_start=self.season_start_var.get().strip() or None,
                 season_end=self.season_end_var.get().strip() or None,
                 max_reports=max_reports or None,
@@ -600,7 +605,8 @@ class LogVaultApp:
             allow_unlisted=self.allow_unlisted_var.get(),
             client_id=self.client_id_var.get().strip() or None,
             client_secret=self.client_secret_var.get().strip() or None,
-            difficulty_id=difficulty_id,
+            difficulty_ids=difficulty_ids,
+            encounter=encounter,
             cancel_check=self.cancel_event.is_set,
         )
 

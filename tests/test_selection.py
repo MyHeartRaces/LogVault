@@ -1,6 +1,6 @@
 import unittest
 
-from logvault.selection import parse_report_input, resolve_fight_ids, selected_time_window
+from logvault.selection import filter_fights_by_encounter, parse_report_input, resolve_fight_ids, selected_time_window
 
 
 class SelectionTests(unittest.TestCase):
@@ -33,6 +33,16 @@ class SelectionTests(unittest.TestCase):
 
         self.assertEqual(resolve_fight_ids(fights), [2])
 
+    def test_filter_fights_by_encounter_id_or_name(self):
+        fights = [
+            {"id": 1, "encounterID": 100, "name": "The Stone Guard"},
+            {"id": 2, "encounterID": 200, "name": "Feng the Accursed"},
+            {"id": 3, "encounterID": 200, "name": "Feng the Accursed"},
+        ]
+
+        self.assertEqual([fight["id"] for fight in filter_fights_by_encounter(fights, "200")], [2, 3])
+        self.assertEqual([fight["id"] for fight in filter_fights_by_encounter(fights, "feng")], [2, 3])
+
     def test_selected_time_window(self):
         fights = [
             {"id": 1, "startTime": 10, "endTime": 20},
@@ -45,4 +55,3 @@ class SelectionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

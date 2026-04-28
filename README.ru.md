@@ -103,11 +103,11 @@ logvault-gui
 
 `Single report` скачивает один отчет по URL или report code.
 
-`Character reports` скачивает recent reports персонажа, фильтрует их по датам сезона, а внутри каждого отчета выгружает только бои выбранной сложности.
+`Character reports` скачивает recent reports персонажа, фильтрует их по датам сезона, а внутри каждого отчета выгружает только бои выбранного difficulty scope и, если указано, только один encounter.
 
 Режим событий по умолчанию - `compact`: сохраняются таблицы и summary, но не сырые event streams. `essential` выгружает небольшой набор событий: deaths, interrupts, dispels, combatant info. `full` включает все сырые события и все еще может быть большим, но raw JSONL хранится как `.jsonl.gz`, а главным файлом для отправки становится `.zip`.
 
-В GUI включена опция `Keep only archive`: после экспорта остается только сжатый архив. Отключай ее только если нужна распакованная папка рядом с архивом. Во время активной выгрузки кнопка `Отменить` останавливает процесс после текущего API-запроса или ближайшей retry-паузы.
+В GUI включена опция `Keep only archive`: после экспорта остается только сжатый архив. Отключай ее только если нужна распакованная папка рядом с архивом. Во время активной выгрузки кнопка `Cancel` останавливает процесс после текущего API-запроса или ближайшей retry-паузы.
 
 Запросы к Warcraft Logs автоматически повторяются при временных сетевых ошибках: dropped connection, incomplete read, HTTP 429 и HTTP 5xx. Если один отчет в массовой выгрузке все равно не скачался после всех попыток, он попадет в skipped, а выгрузка продолжит следующий отчет.
 
@@ -116,7 +116,8 @@ logvault-gui
 - `Character` - имя персонажа.
 - `Realm slug` - slug реалма в Warcraft Logs, например `draenor` или `howling-fjord`.
 - `Region` - `eu`, `us`, `kr`, `tw`, `cn`.
-- `Difficulty` - `All`, `Mythic`, `Heroic`, `Normal`, `LFR`.
+- `Difficulty` - `All`, `Mythic`, `Heroic`, `Mythic + Heroic`, `Normal`, `LFR`; можно также ввести scope через запятую или плюс.
+- `Encounter` - необязательный encounter ID или имя босса, например `Fyrakk` или `2824`.
 - `Season start` / `Season end` - даты в формате `YYYY-MM-DD`.
 
 ## CLI
@@ -137,6 +138,12 @@ logvault REPORTCODE --fight last
 
 ```bash
 logvault REPORTCODE --fight boss
+```
+
+Скачать только один энкаунтер из отчета:
+
+```bash
+logvault REPORTCODE --fight boss --encounter "Boss Name"
 ```
 
 Скачать все файты, включая треш:
@@ -177,6 +184,19 @@ logvault \
   --server realm-slug \
   --region eu \
   --difficulty mythic \
+  --season-start 2026-01-01 \
+  --season-end 2026-06-30
+```
+
+Скачать только Mythic и Heroic пуллы одного энкаунтера:
+
+```bash
+logvault \
+  --character CharacterName \
+  --server realm-slug \
+  --region eu \
+  --difficulty "mythic+heroic" \
+  --encounter "Boss Name" \
   --season-start 2026-01-01 \
   --season-end 2026-06-30
 ```
@@ -261,8 +281,8 @@ chmod +x scripts/build_unix.sh
 GitHub Actions собирает Windows, Linux, macOS, установщик, app bundle и Arch package на tag:
 
 ```bash
-git tag v0.5.6
-git push origin v0.5.6
+git tag v0.6.0
+git push origin v0.6.0
 ```
 
 ## Тесты
