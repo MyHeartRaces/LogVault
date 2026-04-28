@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -60,6 +61,7 @@ def download_report(options: DownloadOptions, progress: ProgressCallback | None 
         client_secret=options.client_secret or getenv_any("WCL_CLIENT_SECRET", "WARCRAFTLOGS_CLIENT_SECRET"),
         access_token=options.access_token or getenv_any("WCL_ACCESS_TOKEN", "WARCRAFTLOGS_ACCESS_TOKEN"),
         timeout=options.timeout,
+        retry_callback=progress,
     )
 
     progress("Authenticating with Warcraft Logs...")
@@ -117,16 +119,20 @@ def download_report(options: DownloadOptions, progress: ProgressCallback | None 
 
     out_dir = fresh_output_dir(options.out, str(report.get("code") or report_input.code), report.get("title"))
     progress(f"Writing bundle to {out_dir}...")
-    out_dir, archive = export_bundle(
-        out_dir=out_dir,
-        report=report,
-        fight_ids=fight_ids,
-        tables=tables,
-        events_by_type=event_iterables,
-        source_url=options.report,
-        make_zip=options.make_zip,
-        archive_only=options.archive_only,
-    )
+    try:
+        out_dir, archive = export_bundle(
+            out_dir=out_dir,
+            report=report,
+            fight_ids=fight_ids,
+            tables=tables,
+            events_by_type=event_iterables,
+            source_url=options.report,
+            make_zip=options.make_zip,
+            archive_only=options.archive_only,
+        )
+    except Exception:
+        shutil.rmtree(out_dir, ignore_errors=True)
+        raise
 
     return DownloadResult(
         out_dir=out_dir,

@@ -13,6 +13,7 @@ from .dates import parse_date_bound, report_timestamp_seconds
 from .difficulty import difficulty_label
 from .download import DownloadOptions, DownloadResult, download_report, getenv_any
 from .env import load_env_file
+from .errors import WarcraftLogsError
 from .exporter import safe_name, zip_bundle
 
 
@@ -73,6 +74,7 @@ def download_character_reports(
         client_secret=options.client_secret or getenv_any("WCL_CLIENT_SECRET", "WARCRAFTLOGS_CLIENT_SECRET"),
         access_token=options.access_token or getenv_any("WCL_ACCESS_TOKEN", "WARCRAFTLOGS_ACCESS_TOKEN"),
         timeout=options.timeout,
+        retry_callback=progress,
     )
 
     progress(
@@ -131,7 +133,7 @@ def download_character_reports(
                 ),
                 progress=progress,
             )
-        except ValueError as exc:
+        except (ValueError, WarcraftLogsError) as exc:
             skipped.append({"code": code, "title": title, "reason": str(exc)})
             progress(f"Skipped {code}: {exc}")
         else:

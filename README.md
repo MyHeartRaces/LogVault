@@ -107,6 +107,8 @@ The default event mode is `compact`, which exports tables and summaries but no r
 
 The GUI enables `Keep only archive` by default. Turn it off only if you want an extracted folder next to the `.zip`.
 
+Warcraft Logs requests are retried automatically on transient network failures such as dropped connections, incomplete reads, HTTP 429, and HTTP 5xx responses. Character batch exports continue with the next report if one report still fails after all retries.
+
 Character fields:
 
 - `Character` - character name.
@@ -257,8 +259,8 @@ chmod +x scripts/build_unix.sh
 GitHub Actions also builds Windows, Linux, macOS, installer, app, and Arch package artifacts on tags:
 
 ```bash
-git tag v0.5.4
-git push origin v0.5.4
+git tag v0.5.5
+git push origin v0.5.5
 ```
 
 ## Tests

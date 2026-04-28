@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import base64
 import gzip
+import http.client
 import json
 import os
+import socket
 import ssl
 import time
 import urllib.error
@@ -12,13 +14,24 @@ import urllib.request
 import zlib
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from .errors import ConfigurationError, GraphQLError, WarcraftLogsError
 
 
 OAUTH_TOKEN_URL = "https://www.warcraftlogs.com/oauth/token"
 GRAPHQL_URL = "https://www.warcraftlogs.com/api/v2/client"
+DEFAULT_RETRY_ATTEMPTS = 8
+DEFAULT_RETRY_BASE_DELAY = 1.0
+DEFAULT_RETRY_MAX_DELAY = 30.0
+RETRYABLE_HTTP_CODES = {408, 425, 429, 500, 502, 503, 504}
+RETRYABLE_TRANSPORT_ERRORS = (
+    http.client.IncompleteRead,
+    http.client.RemoteDisconnected,
+    socket.timeout,
+    TimeoutError,
+    ConnectionError,
+)
 
 
 REPORT_METADATA_QUERY = """
@@ -233,6 +246,10 @@ class WarcraftLogsClient:
         timeout: float = 60,
         token_url: str = OAUTH_TOKEN_URL,
         graphql_url: str = GRAPHQL_URL,
+        retry_attempts: int = DEFAULT_RETRY_ATTEMPTS,
+        retry_base_delay: float = DEFAULT_RETRY_BASE_DELAY,
+        retry_max_delay: float = DEFAULT_RETRY_MAX_DELAY,
+        retry_callback: Callable[[str], None] | None = None,
     ) -> None:
         self.client_id = client_id
         self.client_secret = client_secret
@@ -241,6 +258,10 @@ class WarcraftLogsClient:
         self.timeout = timeout
         self.token_url = token_url
         self.graphql_url = graphql_url
+        self.retry_attempts = max(1, retry_attempts)
+        self.retry_base_delay = max(0.0, retry_base_delay)
+        self.retry_max_delay = max(0.0, retry_max_delay)
+        self.retry_callback = retry_callback
         self.ssl_context = build_ssl_context()
 
     def fetch_report_metadata(self, code: str, *, allow_unlisted: bool = True) -> dict[str, Any]:
@@ -458,32 +479,114 @@ class WarcraftLogsClient:
     ) -> dict[str, Any]:
         request_headers = dict(headers)
         request_headers.setdefault("Accept-Encoding", "gzip, deflate")
-        request = urllib.request.Request(url, data=data, headers=request_headers, method="POST")
-        try:
-            with urllib.request.urlopen(request, timeout=self.timeout, context=self.ssl_context) as response:
-                raw = response.read()
-                content_encoding = response.headers.get("Content-Encoding", "").lower()
-        except urllib.error.HTTPError as exc:
-            raw = exc.read().decode("utf-8", errors="replace")
-            raise WarcraftLogsError(f"HTTP {exc.code} from {url}: {raw}") from exc
-        except urllib.error.URLError as exc:
-            raise WarcraftLogsError(f"Request failed for {url}: {exc.reason}") from exc
+        last_error: BaseException | None = None
 
-        if content_encoding == "gzip":
-            raw = gzip.decompress(raw)
-        elif content_encoding == "deflate":
+        for attempt in range(1, self.retry_attempts + 1):
+            request = urllib.request.Request(url, data=data, headers=request_headers, method="POST")
             try:
-                raw = zlib.decompress(raw)
-            except zlib.error:
-                raw = zlib.decompress(raw, -zlib.MAX_WBITS)
+                with urllib.request.urlopen(request, timeout=self.timeout, context=self.ssl_context) as response:
+                    raw = response.read()
+                    content_encoding = response.headers.get("Content-Encoding", "").lower()
+                return self._decode_json_response(url, raw, content_encoding)
+            except urllib.error.HTTPError as exc:
+                raw = read_error_body(exc)
+                if exc.code in RETRYABLE_HTTP_CODES and attempt < self.retry_attempts:
+                    self._wait_before_retry(f"HTTP {exc.code} from Warcraft Logs", attempt, exc.headers.get("Retry-After"))
+                    continue
+                raise WarcraftLogsError(f"HTTP {exc.code} from {url}: {raw}") from exc
+            except urllib.error.URLError as exc:
+                if is_certificate_error(exc):
+                    raise WarcraftLogsError(f"Request failed for {url}: {exc.reason}") from exc
+                last_error = exc
+                if attempt < self.retry_attempts:
+                    self._wait_before_retry(f"request failed: {exc.reason}", attempt)
+                    continue
+                raise WarcraftLogsError(f"Request failed for {url}: {exc.reason}") from exc
+            except RETRYABLE_TRANSPORT_ERRORS as exc:
+                last_error = exc
+                if attempt < self.retry_attempts:
+                    self._wait_before_retry(f"connection interrupted: {exc}", attempt)
+                    continue
+                raise WarcraftLogsError(f"Request failed for {url}: {exc}") from exc
+            except OSError as exc:
+                if isinstance(exc, ssl.SSLCertVerificationError):
+                    raise WarcraftLogsError(f"Request failed for {url}: {exc}") from exc
+                last_error = exc
+                if attempt < self.retry_attempts:
+                    self._wait_before_retry(f"network error: {exc}", attempt)
+                    continue
+                raise WarcraftLogsError(f"Request failed for {url}: {exc}") from exc
+            except ResponseDecodeError as exc:
+                last_error = exc
+                if attempt < self.retry_attempts:
+                    self._wait_before_retry(str(exc), attempt)
+                    continue
+                raise WarcraftLogsError(str(exc)) from exc
 
+        raise WarcraftLogsError(f"Request failed for {url}: {last_error}")
+
+    def _decode_json_response(self, url: str, raw: bytes, content_encoding: str) -> dict[str, Any]:
         try:
+            if content_encoding == "gzip":
+                raw = gzip.decompress(raw)
+            elif content_encoding == "deflate":
+                try:
+                    raw = zlib.decompress(raw)
+                except zlib.error:
+                    raw = zlib.decompress(raw, -zlib.MAX_WBITS)
             decoded = json.loads(raw.decode("utf-8"))
-        except json.JSONDecodeError as exc:
-            raise WarcraftLogsError(f"Invalid JSON response from {url}: {raw[:500]!r}") from exc
+        except (gzip.BadGzipFile, EOFError, zlib.error, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ResponseDecodeError(f"Invalid JSON response from {url}: {raw[:500]!r}") from exc
         if not isinstance(decoded, dict):
             raise WarcraftLogsError(f"Expected JSON object from {url}, got {type(decoded).__name__}")
         return decoded
+
+    def _wait_before_retry(self, reason: str, attempt: int, retry_after: str | None = None) -> None:
+        delay = retry_delay(
+            attempt,
+            base_delay=self.retry_base_delay,
+            max_delay=self.retry_max_delay,
+            retry_after=retry_after,
+        )
+        next_attempt = attempt + 1
+        if self.retry_callback:
+            self.retry_callback(
+                f"Warcraft Logs request failed ({reason}). "
+                f"Retrying in {delay:g}s ({next_attempt}/{self.retry_attempts})..."
+            )
+        if delay > 0:
+            time.sleep(delay)
+
+
+class ResponseDecodeError(Exception):
+    """Internal marker for transient response bodies that may be retried."""
+
+
+def read_error_body(exc: urllib.error.HTTPError) -> str:
+    try:
+        return exc.read().decode("utf-8", errors="replace")
+    except Exception:
+        return ""
+
+
+def is_certificate_error(exc: urllib.error.URLError) -> bool:
+    reason = exc.reason
+    return isinstance(reason, ssl.SSLCertVerificationError) or "CERTIFICATE_VERIFY_FAILED" in str(reason)
+
+
+def retry_delay(
+    attempt: int,
+    *,
+    base_delay: float = DEFAULT_RETRY_BASE_DELAY,
+    max_delay: float = DEFAULT_RETRY_MAX_DELAY,
+    retry_after: str | None = None,
+) -> float:
+    if retry_after:
+        try:
+            return min(max_delay, max(0.0, float(retry_after)))
+        except ValueError:
+            pass
+    return min(max_delay, base_delay * (2 ** (attempt - 1)))
 
 
 def build_ssl_context() -> ssl.SSLContext:

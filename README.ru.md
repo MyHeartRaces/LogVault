@@ -109,6 +109,8 @@ logvault-gui
 
 В GUI включена опция `Keep only archive`: после экспорта остается только сжатый архив. Отключай ее только если нужна распакованная папка рядом с архивом.
 
+Запросы к Warcraft Logs автоматически повторяются при временных сетевых ошибках: dropped connection, incomplete read, HTTP 429 и HTTP 5xx. Если один отчет в массовой выгрузке все равно не скачался после всех попыток, он попадет в skipped, а выгрузка продолжит следующий отчет.
+
 Поля режима персонажа:
 
 - `Character` - имя персонажа.
@@ -259,8 +261,8 @@ chmod +x scripts/build_unix.sh
 GitHub Actions собирает Windows, Linux, macOS, установщик, app bundle и Arch package на tag:
 
 ```bash
-git tag v0.5.4
-git push origin v0.5.4
+git tag v0.5.5
+git push origin v0.5.5
 ```
 
 ## Тесты
