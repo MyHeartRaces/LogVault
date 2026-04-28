@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import json
 import shutil
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -11,7 +12,7 @@ from typing import Any
 from .api import WarcraftLogsClient
 from .dates import parse_date_bound, report_timestamp_seconds
 from .difficulty import difficulty_label
-from .download import DownloadOptions, DownloadResult, download_report, getenv_any
+from .download import DownloadOptions, DownloadResult, download_report, getenv_any, raise_if_cancelled
 from .env import load_env_file
 from .errors import WarcraftLogsError
 from .exporter import safe_name, zip_bundle
@@ -43,6 +44,7 @@ class CharacterReportsOptions:
     access_token: str | None = None
     timeout: float = 60.0
     env_file: Path | None = Path(".env")
+    cancel_check: Callable[[], bool] | None = None
 
 
 @dataclass
@@ -63,6 +65,7 @@ def download_character_reports(
         raise ValueError("Archive-only output requires zip archive creation.")
     if options.env_file is not None:
         load_env_file(options.env_file)
+    raise_if_cancelled(options.cancel_check)
 
     start_ts = parse_date_bound(options.season_start)
     end_ts = parse_date_bound(options.season_end, end=True)
@@ -75,6 +78,7 @@ def download_character_reports(
         access_token=options.access_token or getenv_any("WCL_ACCESS_TOKEN", "WARCRAFTLOGS_ACCESS_TOKEN"),
         timeout=options.timeout,
         retry_callback=progress,
+        cancel_check=options.cancel_check,
     )
 
     progress(
@@ -104,6 +108,7 @@ def download_character_reports(
     downloaded: list[DownloadResult] = []
     skipped: list[dict[str, Any]] = []
     for index, report in enumerate(reports, start=1):
+        raise_if_cancelled(options.cancel_check)
         code = str(report.get("code") or "")
         title = report.get("title") or code
         if not code:
@@ -130,6 +135,7 @@ def download_character_reports(
                     timeout=options.timeout,
                     env_file=options.env_file,
                     difficulty_id=options.difficulty_id,
+                    cancel_check=options.cancel_check,
                 ),
                 progress=progress,
             )
@@ -174,6 +180,7 @@ def collect_recent_reports(
     page_limit = max(1, min(options.page_limit, 100))
 
     while True:
+        raise_if_cancelled(options.cancel_check)
         page_data = client.fetch_character_recent_reports(
             name=options.character_name,
             server_slug=options.server_slug,
@@ -186,6 +193,7 @@ def collect_recent_reports(
 
         should_stop_for_date = False
         for report in page_data.reports:
+            raise_if_cancelled(options.cancel_check)
             code = str(report.get("code") or "")
             if code in seen_codes:
                 continue

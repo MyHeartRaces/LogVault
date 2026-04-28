@@ -11,6 +11,7 @@ from .api import WarcraftLogsClient
 from .cli_defaults import DEFAULT_EVENT_TYPES, DEFAULT_TABLE_TYPES, ESSENTIAL_EVENT_TYPES, FULL_EVENT_TYPES
 from .difficulty import difficulty_label
 from .env import load_env_file
+from .errors import DownloadCancelled
 from .exporter import export_bundle, fresh_output_dir
 from .selection import parse_list, parse_report_input, resolve_fight_ids, selected_time_window
 
@@ -38,6 +39,7 @@ class DownloadOptions:
     timeout: float = 60.0
     env_file: Path | None = Path(".env")
     difficulty_id: int | None = None
+    cancel_check: Callable[[], bool] | None = None
 
 
 @dataclass
@@ -54,6 +56,7 @@ def download_report(options: DownloadOptions, progress: ProgressCallback | None 
         raise ValueError("Archive-only output requires zip archive creation.")
     if options.env_file is not None:
         load_env_file(options.env_file)
+    raise_if_cancelled(options.cancel_check)
 
     report_input = parse_report_input(options.report)
     client = WarcraftLogsClient(
@@ -62,11 +65,13 @@ def download_report(options: DownloadOptions, progress: ProgressCallback | None 
         access_token=options.access_token or getenv_any("WCL_ACCESS_TOKEN", "WARCRAFTLOGS_ACCESS_TOKEN"),
         timeout=options.timeout,
         retry_callback=progress,
+        cancel_check=options.cancel_check,
     )
 
     progress("Authenticating with Warcraft Logs...")
     progress(f"Fetching report metadata for {report_input.code}...")
     report = client.fetch_report_metadata(report_input.code, allow_unlisted=options.allow_unlisted)
+    raise_if_cancelled(options.cancel_check)
     fights = list(report.get("fights") or [])
     if options.difficulty_id is not None:
         fights = [
@@ -94,6 +99,7 @@ def download_report(options: DownloadOptions, progress: ProgressCallback | None 
 
     tables: dict[str, Any] = {}
     for table_type in table_types:
+        raise_if_cancelled(options.cancel_check)
         progress(f"Fetching table {table_type}...")
         tables[table_type] = client.fetch_table(
             report_input.code,
@@ -101,9 +107,11 @@ def download_report(options: DownloadOptions, progress: ProgressCallback | None 
             fight_ids=fight_ids,
             allow_unlisted=options.allow_unlisted,
         )
+    raise_if_cancelled(options.cancel_check)
 
     event_iterables: dict[str, Iterable[dict[str, Any]]] = {}
     for event_type in event_types:
+        raise_if_cancelled(options.cancel_check)
         events = client.iter_events(
             report_input.code,
             event_type,
@@ -115,7 +123,7 @@ def download_report(options: DownloadOptions, progress: ProgressCallback | None 
             filter_expression=options.filter_expression,
             max_pages=options.max_pages,
         )
-        event_iterables[event_type] = event_progress(event_type, events, progress)
+        event_iterables[event_type] = event_progress(event_type, events, progress, options.cancel_check)
 
     out_dir = fresh_output_dir(options.out, str(report.get("code") or report_input.code), report.get("title"))
     progress(f"Writing bundle to {out_dir}...")
@@ -146,10 +154,12 @@ def event_progress(
     event_type: str,
     events: Iterable[dict[str, Any]],
     progress: ProgressCallback,
+    cancel_check: Callable[[], bool] | None = None,
 ) -> Iterable[dict[str, Any]]:
     progress(f"Fetching events {event_type}...")
     count = 0
     for event in events:
+        raise_if_cancelled(cancel_check)
         count += 1
         if count % 50_000 == 0:
             progress(f"Fetched {count} {event_type} events...")
@@ -183,3 +193,8 @@ def getenv_any(*names: str) -> str | None:
         if value:
             return value
     return None
+
+
+def raise_if_cancelled(cancel_check: Callable[[], bool] | None) -> None:
+    if cancel_check and cancel_check():
+        raise DownloadCancelled("Download cancelled.")

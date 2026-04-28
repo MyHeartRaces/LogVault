@@ -5,7 +5,7 @@ import unittest
 from unittest import mock
 
 from logvault.api import WarcraftLogsClient, retry_delay
-from logvault.errors import WarcraftLogsError
+from logvault.errors import DownloadCancelled, WarcraftLogsError
 
 
 class FakeResponse:
@@ -83,6 +83,15 @@ class ApiRetryTests(unittest.TestCase):
 
     def test_retry_after_caps_delay(self):
         self.assertEqual(retry_delay(1, base_delay=1, max_delay=5, retry_after="9"), 5)
+
+    def test_cancelled_request_does_not_open_connection(self):
+        client = WarcraftLogsClient(access_token="token", cancel_check=lambda: True)
+
+        with mock.patch("urllib.request.urlopen") as urlopen:
+            with self.assertRaises(DownloadCancelled):
+                client._request_json("https://example.test/graphql", data=b"{}", headers={})
+
+        urlopen.assert_not_called()
 
 
 if __name__ == "__main__":

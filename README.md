@@ -105,7 +105,7 @@ Single report mode downloads one Warcraft Logs report URL or report code. Charac
 
 The default event mode is `compact`, which exports tables and summaries but no raw event streams. Use `essential` for deaths/interrupts/dispels/combatant info, or `full` only when you really need raw per-event data. Full event exports can still be large, but raw JSONL is stored as `.jsonl.gz` and the shareable `.zip` is the primary output.
 
-The GUI enables `Keep only archive` by default. Turn it off only if you want an extracted folder next to the `.zip`.
+The GUI enables `Keep only archive` by default. Turn it off only if you want an extracted folder next to the `.zip`. During a running export, use `Отменить` to cancel; LogVault stops after the current API request or retry sleep notices the cancellation.
 
 Warcraft Logs requests are retried automatically on transient network failures such as dropped connections, incomplete reads, HTTP 429, and HTTP 5xx responses. Character batch exports continue with the next report if one report still fails after all retries.
 
@@ -259,8 +259,8 @@ chmod +x scripts/build_unix.sh
 GitHub Actions also builds Windows, Linux, macOS, installer, app, and Arch package artifacts on tags:
 
 ```bash
-git tag v0.5.5
-git push origin v0.5.5
+git tag v0.5.6
+git push origin v0.5.6
 ```
 
 ## Tests

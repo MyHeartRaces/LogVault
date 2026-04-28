@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
-from .errors import ConfigurationError, GraphQLError, WarcraftLogsError
+from .errors import ConfigurationError, DownloadCancelled, GraphQLError, WarcraftLogsError
 
 
 OAUTH_TOKEN_URL = "https://www.warcraftlogs.com/oauth/token"
@@ -250,6 +250,7 @@ class WarcraftLogsClient:
         retry_base_delay: float = DEFAULT_RETRY_BASE_DELAY,
         retry_max_delay: float = DEFAULT_RETRY_MAX_DELAY,
         retry_callback: Callable[[str], None] | None = None,
+        cancel_check: Callable[[], bool] | None = None,
     ) -> None:
         self.client_id = client_id
         self.client_secret = client_secret
@@ -262,6 +263,7 @@ class WarcraftLogsClient:
         self.retry_base_delay = max(0.0, retry_base_delay)
         self.retry_max_delay = max(0.0, retry_max_delay)
         self.retry_callback = retry_callback
+        self.cancel_check = cancel_check
         self.ssl_context = build_ssl_context()
 
     def fetch_report_metadata(self, code: str, *, allow_unlisted: bool = True) -> dict[str, Any]:
@@ -482,16 +484,19 @@ class WarcraftLogsClient:
         last_error: BaseException | None = None
 
         for attempt in range(1, self.retry_attempts + 1):
+            self._raise_if_cancelled()
             request = urllib.request.Request(url, data=data, headers=request_headers, method="POST")
             try:
                 with urllib.request.urlopen(request, timeout=self.timeout, context=self.ssl_context) as response:
                     raw = response.read()
                     content_encoding = response.headers.get("Content-Encoding", "").lower()
+                self._raise_if_cancelled()
                 return self._decode_json_response(url, raw, content_encoding)
             except urllib.error.HTTPError as exc:
                 raw = read_error_body(exc)
                 if exc.code in RETRYABLE_HTTP_CODES and attempt < self.retry_attempts:
-                    self._wait_before_retry(f"HTTP {exc.code} from Warcraft Logs", attempt, exc.headers.get("Retry-After"))
+                    retry_after = exc.headers.get("Retry-After") if exc.headers else None
+                    self._wait_before_retry(f"HTTP {exc.code} from Warcraft Logs", attempt, retry_after)
                     continue
                 raise WarcraftLogsError(f"HTTP {exc.code} from {url}: {raw}") from exc
             except urllib.error.URLError as exc:
@@ -554,8 +559,20 @@ class WarcraftLogsClient:
                 f"Warcraft Logs request failed ({reason}). "
                 f"Retrying in {delay:g}s ({next_attempt}/{self.retry_attempts})..."
             )
-        if delay > 0:
-            time.sleep(delay)
+        self._sleep_with_cancel(delay)
+
+    def _sleep_with_cancel(self, delay: float) -> None:
+        end = time.monotonic() + delay
+        while True:
+            self._raise_if_cancelled()
+            remaining = end - time.monotonic()
+            if remaining <= 0:
+                return
+            time.sleep(min(0.25, remaining))
+
+    def _raise_if_cancelled(self) -> None:
+        if self.cancel_check and self.cancel_check():
+            raise DownloadCancelled("Download cancelled.")
 
 
 class ResponseDecodeError(Exception):

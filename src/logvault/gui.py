@@ -22,7 +22,7 @@ from .character_export import CharacterReportsOptions, CharacterReportsResult, d
 from .difficulty import DIFFICULTY_CHOICES, parse_difficulty
 from .download import DownloadOptions, DownloadResult, download_report
 from .env import load_env_file
-from .errors import LogVaultError
+from .errors import DownloadCancelled, LogVaultError
 
 
 class LogVaultApp:
@@ -36,6 +36,7 @@ class LogVaultApp:
 
         self.messages: queue.Queue[tuple[str, Any]] = queue.Queue()
         self.worker: threading.Thread | None = None
+        self.cancel_event = threading.Event()
         self.last_result: DownloadResult | CharacterReportsResult | None = None
 
         self.env_path = default_env_path()
@@ -398,17 +399,19 @@ class LogVaultApp:
 
         actions = ttk.Frame(root_frame)
         actions.grid(row=4, column=0, sticky="ew", pady=(8, 6))
-        actions.columnconfigure(2, weight=1)
+        actions.columnconfigure(3, weight=1)
         self.download_button = ttk.Button(actions, text="Download", style="Accent.TButton", command=self._start_download)
         self.download_button.grid(row=0, column=0, sticky="w")
+        self.cancel_button = ttk.Button(actions, text="Отменить", command=self._cancel_download, state="disabled")
+        self.cancel_button.grid(row=0, column=1, sticky="w", padx=(8, 0))
         self.open_button = ttk.Button(actions, text="Open output folder", command=self._open_output, state="disabled")
-        self.open_button.grid(row=0, column=1, sticky="w", padx=(8, 0))
+        self.open_button.grid(row=0, column=2, sticky="w", padx=(8, 0))
         self.progress = ttk.Progressbar(actions, mode="indeterminate")
-        self.progress.grid(row=0, column=2, sticky="ew", padx=(12, 0))
+        self.progress.grid(row=0, column=3, sticky="ew", padx=(12, 0))
         ttk.Label(actions, textvariable=self.status_var, style="Root.TLabel").grid(
             row=1,
             column=0,
-            columnspan=3,
+            columnspan=4,
             sticky="w",
             pady=(6, 0),
         )
@@ -503,6 +506,7 @@ class LogVaultApp:
         if self.worker and self.worker.is_alive():
             self.status_var.set("Download is already running.")
             return
+        self.cancel_event.clear()
         self._clear_log()
         self._append_log("Validating input...")
         try:
@@ -526,6 +530,7 @@ class LogVaultApp:
         self.last_result = None
         self.open_button.configure(state="disabled")
         self.download_button.configure(state="disabled")
+        self.cancel_button.configure(state="normal")
         self.progress.start(12)
         self.status_var.set("Downloading...")
         self._append_log("Starting download...")
@@ -577,6 +582,7 @@ class LogVaultApp:
                 allow_unlisted=self.allow_unlisted_var.get(),
                 client_id=self.client_id_var.get().strip() or None,
                 client_secret=self.client_secret_var.get().strip() or None,
+                cancel_check=self.cancel_event.is_set,
             )
 
         return DownloadOptions(
@@ -595,6 +601,7 @@ class LogVaultApp:
             client_id=self.client_id_var.get().strip() or None,
             client_secret=self.client_secret_var.get().strip() or None,
             difficulty_id=difficulty_id,
+            cancel_check=self.cancel_event.is_set,
         )
 
     def _save_env(self, options: DownloadOptions | CharacterReportsOptions) -> Path:
@@ -615,6 +622,8 @@ class LogVaultApp:
                 result = download_character_reports(options, progress=lambda message: self.messages.put(("log", message)))
             else:
                 result = download_report(options, progress=lambda message: self.messages.put(("log", message)))
+        except DownloadCancelled as exc:
+            self.messages.put(("cancelled", str(exc)))
         except (LogVaultError, ValueError) as exc:
             self.messages.put(("error", str(exc)))
         except Exception as exc:  # pragma: no cover - defensive GUI boundary.
@@ -630,6 +639,10 @@ class LogVaultApp:
                 break
             if kind == "log":
                 self._append_log(str(payload))
+            elif kind == "cancelled":
+                self._finish_running()
+                self.status_var.set("Cancelled.")
+                self._append_log(str(payload) or "Download cancelled.")
             elif kind == "error":
                 self._finish_running()
                 self.status_var.set("Download failed.")
@@ -647,6 +660,17 @@ class LogVaultApp:
     def _finish_running(self) -> None:
         self.progress.stop()
         self.download_button.configure(state="normal")
+        self.cancel_button.configure(state="disabled")
+
+    def _cancel_download(self) -> None:
+        if not self.worker or not self.worker.is_alive():
+            self.status_var.set("No active download.")
+            return
+        if not self.cancel_event.is_set():
+            self.cancel_event.set()
+            self._append_log("Cancellation requested. Waiting for the active request to stop...")
+        self.cancel_button.configure(state="disabled")
+        self.status_var.set("Cancelling...")
 
     def _clear_log(self) -> None:
         self.log.configure(state="normal")
