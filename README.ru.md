@@ -305,8 +305,8 @@ chmod +x scripts/build_unix.sh
 GitHub Actions собирает Windows, Linux, macOS, установщик, app bundle и Arch package на tag:
 
 ```bash
-git tag v0.7.0
-git push origin v0.7.0
+git tag v0.7.1
+git push origin v0.7.1
 ```
 
 ## Тесты

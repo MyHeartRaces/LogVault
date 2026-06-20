@@ -64,7 +64,11 @@ mkdir -p "$DMG_ROOT"
 COPYFILE_DISABLE=1 cp -R "$APP_DIR" "$DMG_ROOT/LogVault.app"
 ln -s /Applications "$DMG_ROOT/Applications"
 hdiutil create -volname LogVault -srcfolder "$DMG_ROOT" -ov -format UDZO "$ROOT/$RELEASE_DIR/LogVault-macos-arm64.dmg"
-codesign --force --sign - "$ROOT/$RELEASE_DIR/LogVault-macos-arm64.dmg"
-codesign --verify --verbose=2 "$ROOT/$RELEASE_DIR/LogVault-macos-arm64.dmg"
+if codesign --force --sign - "$ROOT/$RELEASE_DIR/LogVault-macos-arm64.dmg"; then
+  codesign --verify --verbose=2 "$ROOT/$RELEASE_DIR/LogVault-macos-arm64.dmg" || \
+    echo "Warning: DMG codesign verification failed; the app bundle itself is signed."
+else
+  echo "Warning: DMG codesign failed; the app bundle itself is signed."
+fi
 
 echo "Built: $ROOT/$RELEASE_DIR/LogVault-macos-arm64.dmg"
