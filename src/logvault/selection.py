@@ -59,6 +59,14 @@ def resolve_fight_ids(
     return [int(fight["id"]) for fight in selected if fight.get("id") is not None]
 
 
+def filter_completed_fights(fights: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [fight for fight in fights if fight_completed(fight)]
+
+
+def fight_completed(fight: dict[str, Any]) -> bool:
+    return bool(fight.get("kill"))
+
+
 def resolve_selector(fights: list[dict[str, Any]], selector: str) -> list[int]:
     normalized = selector.strip().lower()
     ids = [int(fight["id"]) for fight in fights if fight.get("id") is not None]

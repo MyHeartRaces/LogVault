@@ -41,6 +41,8 @@ def parse_difficulty_scope(value: str | None) -> tuple[int, ...] | None:
     normalized = value.strip().lower()
     if normalized in {"", "all", "any", "все"}:
         return None
+    if normalized in {"mythic+", "m+", "mythic plus", "mythic-plus", "keystone"}:
+        raise ValueError("Mythic+ is a game mode, not a raid difficulty. Use Game mode Mythic+ instead.")
 
     for separator in ("+", "/", ";"):
         normalized = normalized.replace(separator, ",")

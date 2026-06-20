@@ -281,11 +281,15 @@ def zip_bundle(out_dir: Path) -> Path:
 
 def fresh_output_dir(base_dir: Path, report_code: str, title: str | None = None) -> Path:
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    suffix = safe_name(title or report_code)[:48].strip("-") or report_code
-    path = base_dir / f"{report_code}-{suffix}-{stamp}"
+    path = report_output_dir(base_dir, report_code, title, suffix=f"-{stamp}")
     if path.exists():
         shutil.rmtree(path)
     return path
+
+
+def report_output_dir(base_dir: Path, report_code: str, title: str | None = None, suffix: str = "") -> Path:
+    name_suffix = safe_name(title or report_code)[:48].strip("-") or report_code
+    return base_dir / f"{report_code}-{name_suffix}{suffix}"
 
 
 def markdown_table(rows: list[dict[str, str]], columns: list[str]) -> list[str]:

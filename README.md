@@ -101,7 +101,7 @@ Launch:
 logvault-gui
 ```
 
-Single report mode downloads one Warcraft Logs report URL or report code. Character reports mode downloads recent reports for a character, filters them by season dates, then exports fights matching the selected difficulty scope and optional encounter.
+Single report mode downloads one Warcraft Logs report URL or report code. Character reports mode downloads recent reports for a character, scans them first, then exports only completed fights matching the selected game mode, zone/tier, difficulty scope, and optional encounter.
 
 The default event mode is `compact`, which exports tables and summaries but no raw event streams. Use `essential` for deaths/interrupts/dispels/combatant info, or `full` only when you really need raw per-event data. Full event exports can still be large, but raw JSONL is stored as `.jsonl.gz` and the shareable `.zip` is the primary output.
 
@@ -109,13 +109,18 @@ The GUI enables `Keep only archive` by default. Turn it off only if you want an 
 
 Warcraft Logs requests are retried automatically on transient network failures such as dropped connections, incomplete reads, HTTP 429, and HTTP 5xx responses. Character batch exports continue with the next report if one report still fails after all retries.
 
+Character batch exports are resumable. LogVault writes a stable batch folder and `manifest.json` after the scan, then exports one report at a time. Re-running the same filters skips report folders that already contain a complete `metadata.json` and `summary.md`.
+
 Character fields:
 
 - `Character` - character name.
 - `Realm slug` - Warcraft Logs realm slug, for example `draenor` or `howling-fjord`.
 - `Region` - `eu`, `us`, `kr`, `tw`, or `cn`.
+- `Game mode` - `All`, `Raids`, `Mythic+`, or `Custom zone/tier`.
+- `Zone/Tier` - optional zone name, raid tier, or zone ID. Use it for tiers such as `Sporefall`.
 - `Difficulty` - `All`, `Mythic`, `Heroic`, `Mythic + Heroic`, `Normal`, or `LFR`. You can also type a comma/plus-separated scope.
 - `Encounter` - optional encounter ID or boss name, for example `Fyrakk` or `2824`.
+- `Completed only` - enabled by default; unfinished Mythic+ attempts and non-kill boss pulls are excluded from scan counts and exports.
 - `Season start` / `Season end` - `YYYY-MM-DD`.
 
 ## CLI Examples
@@ -199,6 +204,18 @@ logvault \
   --season-end 2026-06-30
 ```
 
+Download completed Mythic+ reports:
+
+```bash
+logvault --character CharacterName --server realm-slug --region eu --content "mythic+" --season-start 2026-01-01 --season-end 2026-06-30
+```
+
+Download a custom raid tier such as Sporefall:
+
+```bash
+logvault --character CharacterName --server realm-slug --region eu --content "custom zone/tier" --zone Sporefall
+```
+
 Download every difficulty for the same season:
 
 ```bash
@@ -279,8 +296,8 @@ chmod +x scripts/build_unix.sh
 GitHub Actions also builds Windows, Linux, macOS, installer, app, and Arch package artifacts on tags:
 
 ```bash
-git tag v0.6.0
-git push origin v0.6.0
+git tag v0.6.1
+git push origin v0.6.1
 ```
 
 ## Tests

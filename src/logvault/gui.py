@@ -19,6 +19,7 @@ except ImportError:  # pragma: no cover - depends on OS Python packages.
     scrolledtext = None
 
 from .character_export import CharacterReportsOptions, CharacterReportsResult, download_character_reports
+from .content import CONTENT_SCOPE_CHOICES, parse_content_scope
 from .difficulty import DIFFICULTY_SCOPE_CHOICES, parse_difficulty_scope
 from .download import DownloadOptions, DownloadResult, download_report
 from .env import load_env_file
@@ -50,8 +51,11 @@ class LogVaultApp:
         self.character_var = tk.StringVar()
         self.server_var = tk.StringVar()
         self.region_var = tk.StringVar(value="eu")
+        self.content_var = tk.StringVar(value="All")
+        self.zone_var = tk.StringVar()
         self.difficulty_var = tk.StringVar(value="All")
         self.encounter_var = tk.StringVar()
+        self.completed_only_var = tk.BooleanVar(value=True)
         self.season_start_var = tk.StringVar()
         self.season_end_var = tk.StringVar()
         self.max_reports_var = tk.StringVar(value="0")
@@ -343,16 +347,25 @@ class LogVaultApp:
         ttk.Combobox(source, textvariable=self.difficulty_var, values=DIFFICULTY_SCOPE_CHOICES, width=18).grid(
             row=4, column=3, sticky="w", padx=6, pady=6
         )
-        self._label(source, "Encounter", 5, 0)
-        ttk.Entry(source, textvariable=self.encounter_var).grid(row=5, column=1, columnspan=3, sticky="ew", padx=6, pady=6)
-        self._label(source, "Season start", 6, 0)
-        ttk.Entry(source, textvariable=self.season_start_var, width=16).grid(row=6, column=1, sticky="w", padx=6, pady=6)
-        self._label(source, "Season end", 6, 2)
-        ttk.Entry(source, textvariable=self.season_end_var, width=16).grid(row=6, column=3, sticky="w", padx=6, pady=6)
-        self._label(source, "Max reports", 7, 0)
-        ttk.Entry(source, textvariable=self.max_reports_var, width=12).grid(row=7, column=1, sticky="w", padx=6, pady=6)
+        self._label(source, "Game mode", 5, 0)
+        ttk.Combobox(source, textvariable=self.content_var, values=CONTENT_SCOPE_CHOICES, width=18).grid(
+            row=5, column=1, sticky="w", padx=6, pady=6
+        )
+        self._label(source, "Zone/Tier", 5, 2)
+        ttk.Entry(source, textvariable=self.zone_var).grid(row=5, column=3, sticky="ew", padx=6, pady=6)
+        self._label(source, "Encounter", 6, 0)
+        ttk.Entry(source, textvariable=self.encounter_var).grid(row=6, column=1, columnspan=3, sticky="ew", padx=6, pady=6)
+        ttk.Checkbutton(source, text="Completed only", variable=self.completed_only_var).grid(
+            row=7, column=1, columnspan=3, sticky="w", padx=6, pady=6
+        )
+        self._label(source, "Season start", 8, 0)
+        ttk.Entry(source, textvariable=self.season_start_var, width=16).grid(row=8, column=1, sticky="w", padx=6, pady=6)
+        self._label(source, "Season end", 8, 2)
+        ttk.Entry(source, textvariable=self.season_end_var, width=16).grid(row=8, column=3, sticky="w", padx=6, pady=6)
+        self._label(source, "Max reports", 9, 0)
+        ttk.Entry(source, textvariable=self.max_reports_var, width=12).grid(row=9, column=1, sticky="w", padx=6, pady=6)
         ttk.Label(source, text="Dates: YYYY-MM-DD. Max reports 0 means no local cap.").grid(
-            row=7, column=2, columnspan=2, sticky="w", padx=6, pady=6
+            row=9, column=2, columnspan=2, sticky="w", padx=6, pady=6
         )
 
         credentials = ttk.LabelFrame(root_frame, text="Warcraft Logs OAuth client")
@@ -543,6 +556,8 @@ class LogVaultApp:
 
     def _collect_options(self) -> DownloadOptions | CharacterReportsOptions:
         report = self.report_var.get().strip()
+        content_scope = parse_content_scope(self.content_var.get())
+        zone_filter = self.zone_var.get().strip() or None
         difficulty_ids = parse_difficulty_scope(self.difficulty_var.get())
         encounter = self.encounter_var.get().strip() or None
         if self.mode_var.get() == "report" and not report:
@@ -569,6 +584,9 @@ class LogVaultApp:
                 character_name=character,
                 server_slug=server,
                 server_region=self.region_var.get().strip() or "eu",
+                content_scope=content_scope,
+                zone_filter=zone_filter,
+                completed_only=self.completed_only_var.get(),
                 difficulty_ids=difficulty_ids,
                 encounter=encounter,
                 season_start=self.season_start_var.get().strip() or None,
@@ -605,6 +623,9 @@ class LogVaultApp:
             allow_unlisted=self.allow_unlisted_var.get(),
             client_id=self.client_id_var.get().strip() or None,
             client_secret=self.client_secret_var.get().strip() or None,
+            content_scope=content_scope,
+            zone_filter=zone_filter,
+            completed_only=self.completed_only_var.get(),
             difficulty_ids=difficulty_ids,
             encounter=encounter,
             cancel_check=self.cancel_event.is_set,

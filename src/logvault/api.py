@@ -316,19 +316,27 @@ class WarcraftLogsClient:
         allow_unlisted: bool = True,
         filter_expression: str | None = None,
     ) -> EventPage:
-        data = self.graphql(
-            REPORT_EVENTS_QUERY,
-            {
+        current_limit = max(1, limit)
+        while True:
+            variables = {
                 "code": code,
                 "allowUnlisted": allow_unlisted,
                 "dataType": data_type,
                 "fightIDs": fight_ids,
                 "startTime": start_time,
                 "endTime": end_time,
-                "limit": limit,
+                "limit": current_limit,
                 "filterExpression": filter_expression,
-            },
-        )
+            }
+            try:
+                data = self.graphql(REPORT_EVENTS_QUERY, variables)
+                break
+            except GraphQLError as exc:
+                next_limit = reduced_api_limit(current_limit)
+                if not is_value_out_of_range(exc) or next_limit is None:
+                    raise
+                self._notify_api_limit_reduction("event page", current_limit, next_limit)
+                current_limit = next_limit
         events = data["reportData"]["report"]["events"]
         return EventPage(
             data=list(events.get("data") or []),
@@ -348,28 +356,36 @@ class WarcraftLogsClient:
             "name": name,
             "serverSlug": server_slug,
             "serverRegion": server_region.lower(),
-            "limit": limit,
+            "limit": max(1, limit),
             "page": page,
         }
-        try:
-            data = self.graphql(CHARACTER_RECENT_REPORTS_QUERY, variables)
-        except GraphQLError as exc:
-            if "Cannot query field" not in str(exc):
-                raise
-            data = self.graphql(CHARACTER_RECENT_REPORTS_MINIMAL_QUERY, variables)
+        while True:
+            try:
+                data = self.graphql(CHARACTER_RECENT_REPORTS_QUERY, variables)
+                break
+            except GraphQLError as exc:
+                if "Cannot query field" in str(exc):
+                    data = self.graphql(CHARACTER_RECENT_REPORTS_MINIMAL_QUERY, variables)
+                    break
+                next_limit = reduced_api_limit(int(variables["limit"]))
+                if not is_value_out_of_range(exc) or next_limit is None:
+                    raise
+                self._notify_api_limit_reduction("recent reports page", int(variables["limit"]), next_limit)
+                variables["limit"] = next_limit
         character = (data.get("characterData") or {}).get("character")
         if not character:
             raise WarcraftLogsError(
                 f"Character not found: {name} on {server_region}/{server_slug}. "
                 "Check character name, realm slug, and region."
             )
+        effective_limit = int(variables["limit"])
         pagination = character.get("recentReports") or {}
         reports = list(pagination.get("data") or [])
         return CharacterReportPage(
             character={key: value for key, value in character.items() if key != "recentReports"},
             reports=reports,
             page=int(pagination.get("current_page") or page),
-            has_more_pages=bool(pagination.get("has_more_pages", len(reports) >= limit)),
+            has_more_pages=bool(pagination.get("has_more_pages", len(reports) >= effective_limit)),
             total=pagination.get("total"),
         )
 
@@ -574,6 +590,13 @@ class WarcraftLogsClient:
         if self.cancel_check and self.cancel_check():
             raise DownloadCancelled("Download cancelled.")
 
+    def _notify_api_limit_reduction(self, label: str, old_limit: int, new_limit: int) -> None:
+        if self.retry_callback:
+            self.retry_callback(
+                f"Warcraft Logs rejected {label} limit {old_limit} as out of range. "
+                f"Retrying with {new_limit}..."
+            )
+
 
 class ResponseDecodeError(Exception):
     """Internal marker for transient response bodies that may be retried."""
@@ -604,6 +627,16 @@ def retry_delay(
         except ValueError:
             pass
     return min(max_delay, base_delay * (2 ** (attempt - 1)))
+
+
+def is_value_out_of_range(exc: GraphQLError) -> bool:
+    return "value out of range" in str(exc).lower()
+
+
+def reduced_api_limit(limit: int) -> int | None:
+    if limit <= 1:
+        return None
+    return max(1, limit // 2)
 
 
 def build_ssl_context() -> ssl.SSLContext:

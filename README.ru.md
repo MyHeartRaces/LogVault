@@ -103,7 +103,7 @@ logvault-gui
 
 `Single report` скачивает один отчет по URL или report code.
 
-`Character reports` скачивает recent reports персонажа, фильтрует их по датам сезона, а внутри каждого отчета выгружает только бои выбранного difficulty scope и, если указано, только один encounter.
+`Character reports` скачивает recent reports персонажа, сначала сканирует их, затем выгружает только завершенные бои выбранного game mode, zone/tier, difficulty scope и, если указано, только один encounter.
 
 Режим событий по умолчанию - `compact`: сохраняются таблицы и summary, но не сырые event streams. `essential` выгружает небольшой набор событий: deaths, interrupts, dispels, combatant info. `full` включает все сырые события и все еще может быть большим, но raw JSONL хранится как `.jsonl.gz`, а главным файлом для отправки становится `.zip`.
 
@@ -111,13 +111,18 @@ logvault-gui
 
 Запросы к Warcraft Logs автоматически повторяются при временных сетевых ошибках: dropped connection, incomplete read, HTTP 429 и HTTP 5xx. Если один отчет в массовой выгрузке все равно не скачался после всех попыток, он попадет в skipped, а выгрузка продолжит следующий отчет.
 
+Массовая выгрузка поддерживает resume. LogVault после scan пишет стабильную batch-папку и `manifest.json`, затем скачивает по одному report. Повторный запуск с теми же фильтрами пропускает report-папки, где уже есть готовые `metadata.json` и `summary.md`.
+
 Поля режима персонажа:
 
 - `Character` - имя персонажа.
 - `Realm slug` - slug реалма в Warcraft Logs, например `draenor` или `howling-fjord`.
 - `Region` - `eu`, `us`, `kr`, `tw`, `cn`.
+- `Game mode` - `All`, `Raids`, `Mythic+`, `Custom zone/tier`.
+- `Zone/Tier` - необязательное имя зоны, raid tier или zone ID. Например `Sporefall`.
 - `Difficulty` - `All`, `Mythic`, `Heroic`, `Mythic + Heroic`, `Normal`, `LFR`; можно также ввести scope через запятую или плюс.
 - `Encounter` - необязательный encounter ID или имя босса, например `Fyrakk` или `2824`.
+- `Completed only` - включено по умолчанию; незавершенные Mythic+ попытки и неубитые boss pulls не попадают в scan count и export.
 - `Season start` / `Season end` - даты в формате `YYYY-MM-DD`.
 
 ## CLI
@@ -201,6 +206,18 @@ logvault \
   --season-end 2026-06-30
 ```
 
+Скачать завершенные Mythic+ отчеты:
+
+```bash
+logvault --character CharacterName --server realm-slug --region eu --content "mythic+" --season-start 2026-01-01 --season-end 2026-06-30
+```
+
+Скачать custom raid tier, например Sporefall:
+
+```bash
+logvault --character CharacterName --server realm-slug --region eu --content "custom zone/tier" --zone Sporefall
+```
+
 Скачать все сложности за сезон:
 
 ```bash
@@ -281,8 +298,8 @@ chmod +x scripts/build_unix.sh
 GitHub Actions собирает Windows, Linux, macOS, установщик, app bundle и Arch package на tag:
 
 ```bash
-git tag v0.6.0
-git push origin v0.6.0
+git tag v0.6.1
+git push origin v0.6.1
 ```
 
 ## Тесты

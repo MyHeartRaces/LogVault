@@ -3,6 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from logvault.character_export import export_complete
 from logvault.exporter import export_bundle
 
 
@@ -73,6 +74,19 @@ class ExporterTests(unittest.TestCase):
             self.assertFalse(out_dir.exists())
             self.assertIsNotNone(archive)
             self.assertTrue(archive.exists())
+
+    def test_export_complete_checks_report_and_fights(self):
+        with tempfile.TemporaryDirectory() as temp:
+            out_dir = Path(temp) / "report"
+            out_dir.mkdir()
+            (out_dir / "summary.md").write_text("ok", encoding="utf-8")
+            (out_dir / "metadata.json").write_text(
+                '{"report": {"code": "abc"}, "selectedFightIDs": [1, 2]}',
+                encoding="utf-8",
+            )
+
+            self.assertTrue(export_complete(out_dir, "abc", [1, 2]))
+            self.assertFalse(export_complete(out_dir, "abc", [2]))
 
 
 if __name__ == "__main__":

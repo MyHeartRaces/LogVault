@@ -9,11 +9,19 @@ from typing import Any
 
 from .api import WarcraftLogsClient
 from .cli_defaults import DEFAULT_EVENT_TYPES, DEFAULT_TABLE_TYPES, ESSENTIAL_EVENT_TYPES, FULL_EVENT_TYPES
+from .content import content_scope_label, report_matches_content, validate_content_filters
 from .difficulty import difficulty_scope_label
 from .env import load_env_file
 from .errors import DownloadCancelled
 from .exporter import export_bundle, fresh_output_dir
-from .selection import filter_fights_by_encounter, parse_list, parse_report_input, resolve_fight_ids, selected_time_window
+from .selection import (
+    filter_completed_fights,
+    filter_fights_by_encounter,
+    parse_list,
+    parse_report_input,
+    resolve_fight_ids,
+    selected_time_window,
+)
 
 
 ProgressCallback = Callable[[str], None]
@@ -41,6 +49,10 @@ class DownloadOptions:
     difficulty_id: int | None = None
     difficulty_ids: tuple[int, ...] | None = None
     encounter: str | None = None
+    content_scope: str | None = None
+    zone_filter: str | None = None
+    completed_only: bool = False
+    output_dir: Path | None = None
     cancel_check: Callable[[], bool] | None = None
 
 
@@ -59,6 +71,7 @@ def download_report(options: DownloadOptions, progress: ProgressCallback | None 
     if options.env_file is not None:
         load_env_file(options.env_file)
     raise_if_cancelled(options.cancel_check)
+    validate_content_filters(options.content_scope, options.zone_filter)
 
     report_input = parse_report_input(options.report)
     client = WarcraftLogsClient(
@@ -74,23 +87,20 @@ def download_report(options: DownloadOptions, progress: ProgressCallback | None 
     progress(f"Fetching report metadata for {report_input.code}...")
     report = client.fetch_report_metadata(report_input.code, allow_unlisted=options.allow_unlisted)
     raise_if_cancelled(options.cancel_check)
-    fights = list(report.get("fights") or [])
-    difficulty_ids = option_difficulty_ids(options.difficulty_id, options.difficulty_ids)
-    if difficulty_ids is not None:
-        difficulty_set = set(difficulty_ids)
-        fights = [fight for fight in fights if int(fight.get("difficulty") or -1) in difficulty_set]
-        progress(f"Applied difficulty filter: {difficulty_scope_label(difficulty_ids)}")
-    if options.encounter:
-        fights = filter_fights_by_encounter(fights, options.encounter)
-        progress(f"Applied encounter filter: {options.encounter}")
-    fight_ids = resolve_fight_ids(
-        fights,
-        explicit=options.fight,
-        url_hint=report_input.fight_hint,
-        include_trash=options.include_trash,
-    )
-    if not fight_ids:
-        raise ValueError("No fights selected. Use fight selector 'all' if this report has no boss pulls.")
+    if not report_matches_content(
+        report,
+        content_scope=options.content_scope,
+        zone_filter=options.zone_filter,
+    ):
+        raise ValueError(
+            "Report does not match content filters "
+            f"(game mode: {content_scope_label(options.content_scope)}, zone/tier: {options.zone_filter or 'all'})."
+        )
+    if options.content_scope:
+        progress(f"Applied game mode filter: {content_scope_label(options.content_scope)}")
+    if options.zone_filter:
+        progress(f"Applied zone/tier filter: {options.zone_filter}")
+    fights, fight_ids = select_report_fights(report, options, url_hint=report_input.fight_hint, progress=progress)
     start_time, end_time = selected_time_window(fights, fight_ids)
 
     table_types = resolve_type_list(options.tables, DEFAULT_TABLE_TYPES)
@@ -128,7 +138,9 @@ def download_report(options: DownloadOptions, progress: ProgressCallback | None 
         )
         event_iterables[event_type] = event_progress(event_type, events, progress, options.cancel_check)
 
-    out_dir = fresh_output_dir(options.out, str(report.get("code") or report_input.code), report.get("title"))
+    out_dir = options.output_dir or fresh_output_dir(options.out, str(report.get("code") or report_input.code), report.get("title"))
+    if options.output_dir is not None and out_dir.exists():
+        shutil.rmtree(out_dir)
     progress(f"Writing bundle to {out_dir}...")
     try:
         out_dir, archive = export_bundle(
@@ -207,6 +219,40 @@ def option_difficulty_ids(
     if difficulty_id is not None:
         return (difficulty_id,)
     return None
+
+
+def select_report_fights(
+    report: dict[str, Any],
+    options: DownloadOptions,
+    *,
+    url_hint: str | None = None,
+    progress: ProgressCallback | None = None,
+) -> tuple[list[dict[str, Any]], list[int]]:
+    progress = progress or (lambda _message: None)
+    fights = list(report.get("fights") or [])
+    difficulty_ids = option_difficulty_ids(options.difficulty_id, options.difficulty_ids)
+    if difficulty_ids is not None:
+        difficulty_set = set(difficulty_ids)
+        fights = [fight for fight in fights if int(fight.get("difficulty") or -1) in difficulty_set]
+        progress(f"Applied difficulty filter: {difficulty_scope_label(difficulty_ids)}")
+    if options.encounter:
+        fights = filter_fights_by_encounter(fights, options.encounter)
+        progress(f"Applied encounter filter: {options.encounter}")
+    if options.completed_only:
+        fights = filter_completed_fights(fights)
+        progress("Applied completed-only filter.")
+
+    fight_ids = resolve_fight_ids(
+        fights,
+        explicit=options.fight,
+        url_hint=url_hint,
+        include_trash=options.include_trash,
+    )
+    if not fight_ids:
+        if options.completed_only:
+            raise ValueError("No completed fights selected.")
+        raise ValueError("No fights selected. Use fight selector 'all' if this report has no boss pulls.")
+    return fights, fight_ids
 
 
 def raise_if_cancelled(cancel_check: Callable[[], bool] | None) -> None:
