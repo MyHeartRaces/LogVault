@@ -44,6 +44,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--zone", help="Optional zone or raid tier filter, for example Sporefall or a zone ID.")
     parser.add_argument(
+        "--essential-mode",
+        action="store_true",
+        help=(
+            "Character batch only: export Mythic raid kills and, for each Mythic+ dungeon, "
+            "the highest timed key level plus the previous level."
+        ),
+    )
+    parser.add_argument(
         "--difficulty",
         default="all",
         help=(
@@ -119,6 +127,8 @@ def build_parser() -> argparse.ArgumentParser:
 def run_download(args: argparse.Namespace) -> int:
     content_scope = parse_content_scope(args.content)
     difficulty_ids = parse_difficulty_scope(args.difficulty)
+    if args.essential_mode and not args.character:
+        raise ValueError("--essential-mode requires --character.")
     if args.character:
         if not args.server:
             raise ValueError("--server is required with --character.")
@@ -129,6 +139,7 @@ def run_download(args: argparse.Namespace) -> int:
                 server_region=args.region,
                 content_scope=content_scope,
                 zone_filter=args.zone,
+                essential_mode=args.essential_mode,
                 completed_only=not args.include_unfinished,
                 difficulty_ids=difficulty_ids,
                 encounter=args.encounter,

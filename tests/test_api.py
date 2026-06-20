@@ -5,7 +5,7 @@ import unittest
 from unittest import mock
 
 from logvault.api import WarcraftLogsClient, retry_delay
-from logvault.errors import DownloadCancelled, WarcraftLogsError
+from logvault.errors import DownloadCancelled, GraphQLError, WarcraftLogsError
 
 
 class FakeResponse:
@@ -92,6 +92,35 @@ class ApiRetryTests(unittest.TestCase):
                 client._request_json("https://example.test/graphql", data=b"{}", headers={})
 
         urlopen.assert_not_called()
+
+    def test_metadata_keystone_field_fallback_keeps_full_metadata(self):
+        class FakeClient(WarcraftLogsClient):
+            def __init__(self):
+                super().__init__(access_token="token")
+                self.calls = 0
+
+            def graphql(self, query, variables=None):
+                self.calls += 1
+                if "keystoneLevel" in query:
+                    raise GraphQLError('Cannot query field "keystoneLevel" on type "ReportFight".')
+                return {
+                    "reportData": {
+                        "report": {
+                            "code": "abc",
+                            "zone": {"name": "Sporefall"},
+                            "masterData": {"actors": [], "abilities": []},
+                            "fights": [{"id": 1, "difficulty": 5}],
+                        }
+                    }
+                }
+
+        client = FakeClient()
+
+        report = client.fetch_report_metadata("abc")
+
+        self.assertEqual(client.calls, 2)
+        self.assertEqual(report["zone"]["name"], "Sporefall")
+        self.assertIsNone(report["fights"][0]["keystoneLevel"])
 
 
 if __name__ == "__main__":

@@ -55,6 +55,7 @@ class LogVaultApp:
         self.zone_var = tk.StringVar()
         self.difficulty_var = tk.StringVar(value="All")
         self.encounter_var = tk.StringVar()
+        self.essential_mode_var = tk.BooleanVar(value=False)
         self.completed_only_var = tk.BooleanVar(value=True)
         self.season_start_var = tk.StringVar()
         self.season_end_var = tk.StringVar()
@@ -356,7 +357,10 @@ class LogVaultApp:
         self._label(source, "Encounter", 6, 0)
         ttk.Entry(source, textvariable=self.encounter_var).grid(row=6, column=1, columnspan=3, sticky="ew", padx=6, pady=6)
         ttk.Checkbutton(source, text="Completed only", variable=self.completed_only_var).grid(
-            row=7, column=1, columnspan=3, sticky="w", padx=6, pady=6
+            row=7, column=1, sticky="w", padx=6, pady=6
+        )
+        ttk.Checkbutton(source, text="Essential mode", variable=self.essential_mode_var).grid(
+            row=7, column=2, columnspan=2, sticky="w", padx=6, pady=6
         )
         self._label(source, "Season start", 8, 0)
         ttk.Entry(source, textvariable=self.season_start_var, width=16).grid(row=8, column=1, sticky="w", padx=6, pady=6)
@@ -586,6 +590,7 @@ class LogVaultApp:
                 server_region=self.region_var.get().strip() or "eu",
                 content_scope=content_scope,
                 zone_filter=zone_filter,
+                essential_mode=self.essential_mode_var.get(),
                 completed_only=self.completed_only_var.get(),
                 difficulty_ids=difficulty_ids,
                 encounter=encounter,

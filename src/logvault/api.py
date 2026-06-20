@@ -55,6 +55,57 @@ query ReportMetadata($code: String!, $allowUnlisted: Boolean!) {
         name
         difficulty
         kill
+        keystoneLevel
+        keystoneBonus
+        startTime
+        endTime
+        bossPercentage
+        fightPercentage
+        lastPhase
+      }
+      masterData(translate: true) {
+        actors {
+          id
+          gameID
+          name
+          petOwner
+          type
+          subType
+          server
+        }
+        abilities {
+          gameID
+          name
+          type
+        }
+      }
+    }
+  }
+}
+"""
+
+
+REPORT_METADATA_SAFE_QUERY = """
+query ReportMetadataSafe($code: String!, $allowUnlisted: Boolean!) {
+  reportData {
+    report(code: $code, allowUnlisted: $allowUnlisted) {
+      code
+      title
+      startTime
+      endTime
+      owner {
+        name
+      }
+      zone {
+        id
+        name
+      }
+      fights {
+        id
+        encounterID
+        name
+        difficulty
+        kill
         startTime
         endTime
         bossPercentage
@@ -274,15 +325,24 @@ class WarcraftLogsClient:
         except GraphQLError as exc:
             if "Cannot query field" not in str(exc):
                 raise
-            data = self.graphql(REPORT_METADATA_MINIMAL_QUERY, variables)
-            report = data["reportData"]["report"]
-            report.setdefault("owner", None)
-            report.setdefault("zone", None)
-            report.setdefault("masterData", {"actors": [], "abilities": []})
+            try:
+                data = self.graphql(REPORT_METADATA_SAFE_QUERY, variables)
+                report = data["reportData"]["report"]
+            except GraphQLError as safe_exc:
+                if "Cannot query field" not in str(safe_exc):
+                    raise
+                data = self.graphql(REPORT_METADATA_MINIMAL_QUERY, variables)
+                report = data["reportData"]["report"]
+                report.setdefault("owner", None)
+                report.setdefault("zone", None)
+                report.setdefault("masterData", {"actors": [], "abilities": []})
+                for fight in report.get("fights") or []:
+                    fight.setdefault("bossPercentage", None)
+                    fight.setdefault("fightPercentage", None)
+                    fight.setdefault("lastPhase", None)
             for fight in report.get("fights") or []:
-                fight.setdefault("bossPercentage", None)
-                fight.setdefault("fightPercentage", None)
-                fight.setdefault("lastPhase", None)
+                fight.setdefault("keystoneLevel", None)
+                fight.setdefault("keystoneBonus", None)
             return report
 
     def fetch_table(

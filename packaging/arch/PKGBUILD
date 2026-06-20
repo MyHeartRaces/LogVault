@@ -1,6 +1,6 @@
 # Maintainer: LogVault
 pkgname=logvault
-pkgver=0.6.3
+pkgver=0.7.0
 pkgrel=1
 pkgdesc="GUI downloader/exporter for Warcraft Logs reports"
 arch=("any")

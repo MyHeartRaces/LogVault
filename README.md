@@ -121,6 +121,7 @@ Character fields:
 - `Difficulty` - `All`, `Mythic`, `Heroic`, `Mythic + Heroic`, `Normal`, or `LFR`. You can also type a comma/plus-separated scope.
 - `Encounter` - optional encounter ID or boss name, for example `Fyrakk` or `2824`.
 - `Completed only` - enabled by default; unfinished Mythic+ attempts and non-kill boss pulls are excluded from scan counts and exports.
+- `Essential mode` - character batch preset. For Mythic+, LogVault keeps only timed runs at the highest timed level and the previous level per dungeon. For raids, it keeps completed Mythic boss fights. This preset uses its own fight selection and forces completed-only behavior.
 - `Season start` / `Season end` - `YYYY-MM-DD`.
 
 ## CLI Examples
@@ -210,6 +211,12 @@ Download completed Mythic+ reports:
 logvault --character CharacterName --server realm-slug --region eu --content "mythic+" --season-start 2026-01-01 --season-end 2026-06-30
 ```
 
+Download an essential season sample for review:
+
+```bash
+logvault --character CharacterName --server realm-slug --region eu --essential-mode --season-start 2026-01-01 --season-end 2026-06-30
+```
+
 Download a custom raid tier such as Sporefall:
 
 ```bash
@@ -296,8 +303,8 @@ chmod +x scripts/build_unix.sh
 GitHub Actions also builds Windows, Linux, macOS, installer, app, and Arch package artifacts on tags:
 
 ```bash
-git tag v0.6.3
-git push origin v0.6.3
+git tag v0.7.0
+git push origin v0.7.0
 ```
 
 ## Tests

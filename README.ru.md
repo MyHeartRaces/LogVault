@@ -123,6 +123,7 @@ logvault-gui
 - `Difficulty` - `All`, `Mythic`, `Heroic`, `Mythic + Heroic`, `Normal`, `LFR`; можно также ввести scope через запятую или плюс.
 - `Encounter` - необязательный encounter ID или имя босса, например `Fyrakk` или `2824`.
 - `Completed only` - включено по умолчанию; незавершенные Mythic+ попытки и неубитые boss pulls не попадают в scan count и export.
+- `Essential mode` - preset для character batch. Из Mythic+ остаются только timed runs на самом высоком закрытом в тайм уровне и уровне ниже для каждого dungeon. Из рейдов остаются завершенные Mythic boss fights. Preset использует собственный fight selection и принудительно включает completed-only поведение.
 - `Season start` / `Season end` - даты в формате `YYYY-MM-DD`.
 
 ## CLI
@@ -212,6 +213,12 @@ logvault \
 logvault --character CharacterName --server realm-slug --region eu --content "mythic+" --season-start 2026-01-01 --season-end 2026-06-30
 ```
 
+Скачать essential выборку сезона для разбора:
+
+```bash
+logvault --character CharacterName --server realm-slug --region eu --essential-mode --season-start 2026-01-01 --season-end 2026-06-30
+```
+
 Скачать custom raid tier, например Sporefall:
 
 ```bash
@@ -298,8 +305,8 @@ chmod +x scripts/build_unix.sh
 GitHub Actions собирает Windows, Linux, macOS, установщик, app bundle и Arch package на tag:
 
 ```bash
-git tag v0.6.3
-git push origin v0.6.3
+git tag v0.7.0
+git push origin v0.7.0
 ```
 
 ## Тесты

@@ -25,6 +25,15 @@ from .download import (
 from .env import load_env_file
 from .errors import WarcraftLogsError
 from .exporter import report_output_dir, safe_name, zip_bundle
+from .essential import (
+    MythicPlusFight,
+    essential_includes_mythic_plus,
+    essential_includes_raid,
+    extract_mythic_plus_fights,
+    mythic_plus_target_levels,
+    mythic_plus_targets_summary,
+    select_mythic_raid_fight_ids,
+)
 
 
 @dataclass
@@ -37,6 +46,7 @@ class CharacterReportsOptions:
     encounter: str | None = None
     content_scope: str | None = None
     zone_filter: str | None = None
+    essential_mode: bool = False
     completed_only: bool = True
     season_start: str | None = None
     season_end: str | None = None
@@ -76,6 +86,16 @@ class PlannedReport:
     metadata: dict[str, Any]
     fight_ids: list[int]
     out_dir: Path
+
+
+@dataclass
+class EssentialCandidate:
+    index: int
+    source: dict[str, Any]
+    metadata: dict[str, Any]
+    kind: str
+    raid_fight_ids: list[int] | None = None
+    mythic_plus_fights: list[MythicPlusFight] | None = None
 
 
 def download_character_reports(
@@ -120,9 +140,10 @@ def download_character_reports(
             safe_name(options.server_slug),
             safe_name(content_scope_label(options.content_scope)),
             safe_name(options.zone_filter or ""),
-            safe_name(difficulty_scope_label(option_difficulty_ids(options.difficulty_id, options.difficulty_ids))),
+            "essential" if options.essential_mode else "",
+            safe_name(character_difficulty_label(options)),
             safe_name(options.encounter or ""),
-            "completed" if options.completed_only else "all-fights",
+            "completed" if character_completed_only(options) else "all-fights",
         ]
         if part
     )
@@ -162,10 +183,11 @@ def download_character_reports(
             continue
         progress(f"[{index}/{len(planned)}] Exporting report {code}: {title}")
         try:
+            planned_fight_selector = ",".join(str(fight_id) for fight_id in item.fight_ids)
             result = download_report(
                 DownloadOptions(
                     report=code,
-                    fight=options.fight,
+                    fight=planned_fight_selector if options.essential_mode else options.fight,
                     include_trash=options.include_trash,
                     tables=options.tables,
                     events=options.events,
@@ -180,12 +202,12 @@ def download_character_reports(
                     access_token=options.access_token,
                     timeout=options.timeout,
                     env_file=options.env_file,
-                    difficulty_id=options.difficulty_id,
-                    difficulty_ids=options.difficulty_ids,
-                    encounter=options.encounter,
+                    difficulty_id=None if options.essential_mode else options.difficulty_id,
+                    difficulty_ids=None if options.essential_mode else options.difficulty_ids,
+                    encounter=None if options.essential_mode else options.encounter,
                     content_scope=options.content_scope,
                     zone_filter=options.zone_filter,
-                    completed_only=options.completed_only,
+                    completed_only=True if options.essential_mode else options.completed_only,
                     output_dir=item.out_dir,
                     cancel_check=options.cancel_check,
                 ),
@@ -291,6 +313,15 @@ def scan_exportable_reports(
     reports_dir: Path,
     progress,
 ) -> tuple[list[PlannedReport], list[dict[str, Any]]]:
+    if options.essential_mode:
+        return scan_essential_reports(
+            client=client,
+            options=options,
+            source_reports=source_reports,
+            reports_dir=reports_dir,
+            progress=progress,
+        )
+
     progress(f"Scanning {len(source_reports)} candidate reports for exportable fights...")
     planned: list[PlannedReport] = []
     skipped: list[dict[str, Any]] = []
@@ -339,6 +370,116 @@ def scan_exportable_reports(
     return planned, skipped
 
 
+def scan_essential_reports(
+    *,
+    client: WarcraftLogsClient,
+    options: CharacterReportsOptions,
+    source_reports: list[dict[str, Any]],
+    reports_dir: Path,
+    progress,
+) -> tuple[list[PlannedReport], list[dict[str, Any]]]:
+    progress(
+        "Essential mode: scanning candidates for Mythic raid kills and timed Mythic+ target levels..."
+    )
+    candidates: list[EssentialCandidate] = []
+    skipped: list[dict[str, Any]] = []
+    all_mythic_plus_fights: list[MythicPlusFight] = []
+
+    for index, report in enumerate(source_reports, start=1):
+        raise_if_cancelled(options.cancel_check)
+        code = str(report.get("code") or "")
+        title = report.get("title") or code
+        if not code:
+            skipped.append({"code": "", "title": title, "reason": "missing report code"})
+            continue
+
+        progress(f"Scanning report {index}/{len(source_reports)}: {code}")
+        try:
+            metadata = client.fetch_report_metadata(code, allow_unlisted=options.allow_unlisted)
+        except WarcraftLogsError as exc:
+            skipped.append({"code": code, "title": title, "reason": str(exc)})
+            continue
+
+        if not report_matches_content(
+            metadata,
+            content_scope=options.content_scope,
+            zone_filter=options.zone_filter,
+        ):
+            skipped.append({"code": code, "title": title, "reason": "content filters"})
+            continue
+
+        mythic_plus_fights = (
+            extract_mythic_plus_fights(metadata, completed_only=True)
+            if essential_includes_mythic_plus(options.content_scope)
+            else []
+        )
+        if mythic_plus_fights:
+            all_mythic_plus_fights.extend(mythic_plus_fights)
+            candidates.append(
+                EssentialCandidate(
+                    index=index,
+                    source=report,
+                    metadata=metadata,
+                    kind="mythic_plus",
+                    mythic_plus_fights=mythic_plus_fights,
+                )
+            )
+            continue
+
+        raid_fight_ids = (
+            select_mythic_raid_fight_ids(metadata, completed_only=True)
+            if essential_includes_raid(options.content_scope)
+            else []
+        )
+        if raid_fight_ids:
+            candidates.append(
+                EssentialCandidate(
+                    index=index,
+                    source=report,
+                    metadata=metadata,
+                    kind="raid",
+                    raid_fight_ids=raid_fight_ids,
+                )
+            )
+            continue
+
+        skipped.append({"code": code, "title": title, "reason": "essential mode filters"})
+
+    targets = mythic_plus_target_levels(all_mythic_plus_fights)
+    if targets:
+        progress(f"Essential mode Mythic+ targets: {mythic_plus_targets_summary(all_mythic_plus_fights, targets)}")
+
+    planned: list[PlannedReport] = []
+    for candidate in sorted(candidates, key=lambda item: item.index):
+        code = str(candidate.metadata.get("code") or candidate.source.get("code") or "")
+        title = candidate.metadata.get("title") or candidate.source.get("title") or code
+        if candidate.kind == "mythic_plus":
+            selected_fights = [
+                fight
+                for fight in candidate.mythic_plus_fights or []
+                if fight.level in targets.get(fight.dungeon_key, set())
+            ]
+            fight_ids = [fight.fight_id for fight in selected_fights]
+            if not fight_ids:
+                skipped.append({"code": code, "title": title, "reason": "essential Mythic+ level filter"})
+                continue
+        else:
+            fight_ids = list(candidate.raid_fight_ids or [])
+
+        planned.append(
+            PlannedReport(
+                source=candidate.source,
+                metadata=candidate.metadata,
+                fight_ids=fight_ids,
+                out_dir=report_output_dir(reports_dir, code, title),
+            )
+        )
+        if options.max_reports is not None and len(planned) >= options.max_reports:
+            break
+
+    return planned, skipped
+
+
 def export_complete(out_dir: Path, report_code: str, fight_ids: list[int]) -> bool:
     metadata_path = out_dir / "metadata.json"
     summary_path = out_dir / "summary.md"
@@ -373,9 +514,10 @@ def write_character_index(
             "serverRegion": options.server_region,
             "contentScope": content_scope_label(options.content_scope),
             "zoneTier": options.zone_filter,
-            "difficulty": difficulty_scope_label(option_difficulty_ids(options.difficulty_id, options.difficulty_ids)),
+            "essentialMode": options.essential_mode,
+            "difficulty": character_difficulty_label(options),
             "encounter": options.encounter,
-            "completedOnly": options.completed_only,
+            "completedOnly": character_completed_only(options),
             "seasonStart": options.season_start,
             "seasonEnd": options.season_end,
             "maxReports": options.max_reports,
@@ -435,9 +577,10 @@ def write_character_index(
         f"- Server: `{options.server_region}/{options.server_slug}`",
         f"- Game mode: {content_scope_label(options.content_scope)}",
         f"- Zone/tier: {options.zone_filter or 'all'}",
-        f"- Difficulty: {difficulty_scope_label(option_difficulty_ids(options.difficulty_id, options.difficulty_ids))}",
+        f"- Essential mode: {'yes' if options.essential_mode else 'no'}",
+        f"- Difficulty: {character_difficulty_label(options)}",
         f"- Encounter: {options.encounter or 'all'}",
-        f"- Completed only: {'yes' if options.completed_only else 'no'}",
+        f"- Completed only: {'yes' if character_completed_only(options) else 'no'}",
         f"- Season start: {options.season_start or 'not set'}",
         f"- Season end: {options.season_end or 'not set'}",
         f"- Reports matched: {len(source_reports)}",
@@ -457,3 +600,13 @@ def write_character_index(
 
 def escape_md(value: Any) -> str:
     return str(value).replace("|", "\\|").replace("\n", " ")
+
+
+def character_difficulty_label(options: CharacterReportsOptions) -> str:
+    if options.essential_mode:
+        return "Essential preset (raid Mythic)"
+    return difficulty_scope_label(option_difficulty_ids(options.difficulty_id, options.difficulty_ids))
+
+
+def character_completed_only(options: CharacterReportsOptions) -> bool:
+    return True if options.essential_mode else options.completed_only
