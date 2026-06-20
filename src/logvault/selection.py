@@ -85,6 +85,8 @@ def resolve_selector(fights: list[dict[str, Any]], selector: str) -> list[int]:
             for fight in fights
             if fight.get("id") is not None and int(fight.get("encounterID") or 0) > 0
         ]
+        if not boss_ids and not ids:
+            return []
         return [boss_ids[-1] if boss_ids else ids[-1]]
 
     resolved: list[int] = []

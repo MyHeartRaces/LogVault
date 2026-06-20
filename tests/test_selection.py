@@ -31,6 +31,9 @@ class SelectionTests(unittest.TestCase):
 
         self.assertEqual(resolve_fight_ids(fights, explicit="last"), [3])
 
+    def test_resolve_last_returns_empty_for_empty_fights(self):
+        self.assertEqual(resolve_fight_ids([], explicit="last"), [])
+
     def test_default_selects_boss_fights(self):
         fights = [
             {"id": 1, "encounterID": 0},

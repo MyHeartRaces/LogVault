@@ -48,6 +48,36 @@ class CharacterExportTests(unittest.TestCase):
         self.assertEqual([item.metadata["code"] for item in planned], ["kill"])
         self.assertEqual(skipped[0]["code"], "wipe")
 
+    def test_scan_skips_empty_report_with_last_selector(self):
+        reports = {
+            "empty": {
+                "code": "empty",
+                "title": "Empty",
+                "zone": {"name": "Sporefall"},
+                "fights": [],
+            },
+        }
+        options = CharacterReportsOptions(
+            character_name="Player",
+            server_slug="realm",
+            server_region="eu",
+            completed_only=True,
+            fight="last",
+        )
+
+        with tempfile.TemporaryDirectory() as temp:
+            planned, skipped = scan_exportable_reports(
+                client=FakeClient(reports),
+                options=options,
+                source_reports=[{"code": "empty"}],
+                reports_dir=Path(temp),
+                progress=lambda _message: None,
+            )
+
+        self.assertEqual(planned, [])
+        self.assertEqual(skipped[0]["code"], "empty")
+        self.assertEqual(skipped[0]["reason"], "No completed fights selected.")
+
 
 if __name__ == "__main__":
     unittest.main()
